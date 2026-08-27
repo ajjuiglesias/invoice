@@ -1,0 +1,26 @@
+{
+  "name": "jcem-invoice-generator",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "template": "node scripts/make-template.mjs",
+    "dev": "npm run template && vite",
+    "build": "npm run template && tsc -b && vite build",
+    "preview": "vite preview",
+    "verify": "node scripts/verify-writer.mjs"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "fast-xml-parser": "^5.11.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+
+# The real invoices carry names, addresses and bank details. Keep them out of
+# the repo. The app does not need them: app/public/template.xlsx is the
+# scrubbed copy and IS committed.
+/Invoice*.xlsx
+~$*.xlsx
+
+# TypeScript incremental build cache
+*.tsbuildinfo
