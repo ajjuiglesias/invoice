@@ -19,6 +19,7 @@ type Status = { tone: 'info' | 'error'; text: string } | null;
 
 export function ReviewScreen({ invoice, onBack, onRecord }: Props) {
   const [busy, setBusy] = useState(false);
+  const [busyPdf, setBusyPdf] = useState(false);
   const [status, setStatus] = useState<Status>(null);
   const [downloaded, setDownloaded] = useState(false);
 
@@ -59,11 +60,26 @@ export function ReviewScreen({ invoice, onBack, onRecord }: Props) {
     }
   };
 
-  const printPdf = () => {
-    onRecord(invoice);
-    setDownloaded(true);
-    // The print stylesheet hides everything except the invoice sheet.
-    window.print();
+  const downloadPdf = async () => {
+    setBusyPdf(true);
+    setStatus(null);
+    try {
+      // The PDF renderer is ~1MB, so it is only fetched when someone actually
+      // asks for a PDF rather than on every page load.
+      const { buildPdf } = await import('../export/pdf');
+      const blob = await buildPdf(invoice);
+      downloadBlob(blob, pdfName);
+      setDownloaded(true);
+      onRecord(invoice);
+      setStatus({ tone: 'info', text: `Saved ${pdfName}.` });
+    } catch (error) {
+      setStatus({
+        tone: 'error',
+        text: error instanceof Error ? error.message : 'Could not build the PDF.',
+      });
+    } finally {
+      setBusyPdf(false);
+    }
   };
 
   const message = buildMessage(invoice, [xlsxName, pdfName]);
@@ -164,14 +180,19 @@ export function ReviewScreen({ invoice, onBack, onRecord }: Props) {
               {busy && <span className="spinner" aria-hidden="true" />}
               {busy ? 'Building…' : `Download ${xlsxName}`}
             </button>
-            <button type="button" className="btn btn--dark" onClick={printPdf} disabled={blocked}>
-              Save the branded PDF
+            <button
+              type="button"
+              className="btn btn--dark"
+              onClick={downloadPdf}
+              disabled={blocked || busyPdf}
+            >
+              {busyPdf && <span className="spinner" aria-hidden="true" />}
+              {busyPdf ? 'Building…' : `Download ${pdfName}`}
             </button>
           </div>
           <p className="small muted" style={{ margin: '12px 0 0' }}>
-            The PDF button opens your browser's print dialog — choose{' '}
-            <strong>Save as PDF</strong> as the destination, and name it{' '}
-            <strong>{pdfName}</strong>.
+            Send both: accounts work from the spreadsheet, and the PDF is the readable copy. The
+            Asana and page links stay clickable in both.
           </p>
         </Card>
 

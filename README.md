@@ -24,8 +24,9 @@ details never leave your computer.
    `accounts@juliacharles.co.uk` copied in, subject and body written. Attach the
    two files and send.
 
-The PDF is produced through your browser's print dialog — choose **Save as PDF**
-as the destination.
+Both files download directly — no print dialog. The PDF is a real vector PDF
+with Open Sans embedded, so the text stays selectable and the Asana and page
+links stay clickable for whoever reviews it.
 
 ### The rules it enforces
 
@@ -47,21 +48,35 @@ Taken from the template's own *How To* sheet:
 cd app && npm install && npm run dev
 ```
 
-### Verifying the Excel writer
-
-The riskiest part of the app is writing into the company's workbook. There is a
-harness that rebuilds a real, previously-submitted invoice and checks the result
-cell by cell:
+### Checks
 
 ```bash
-cd app && npm run verify
+cd app && npm run check
 ```
 
-It asserts that values land in the right cells, the subtotal matches, all 29
-amount formulas and `SUM(J19:J47)` stay live, hyperlinks resolve, every XML part
-is well-formed, and the theme, logo drawing, printer settings and *How To* sheet
-come out byte-identical to the template. Run it after touching anything under
-`src/export/`.
+That runs everything CI runs: typecheck, unit tests, the Excel writer harness
+and the PDF smoke test. The individual pieces:
+
+| Command | What it covers |
+| --- | --- |
+| `npm run test` | Rate card invariants, totals and rounding, the deadline maths, and every validation rule. |
+| `npm run verify` | The Excel writer, cell by cell. |
+| `npm run verify:pdf` | The branded PDF. |
+
+**`npm run verify` is the one that must never go red.** It rebuilds a real,
+previously-submitted invoice and asserts that values land in the right cells,
+the subtotal matches, all 29 amount formulas and `SUM(J19:J47)` stay live,
+hyperlinks resolve, every XML part is well-formed, and the theme, logo drawing,
+printer settings and *How To* sheet come out byte-identical to the template.
+
+`npm run verify:pdf` renders a sample invoice and a deliberately long one, and
+checks the output is a real PDF with all three Open Sans weights embedded (never
+silently falling back to Helvetica), one clickable annotation per link, and
+correct pagination. It writes the samples to `node_modules/.cache/` so you can
+open and eyeball them.
+
+CI runs all of this on every push and pull request — see
+`.github/workflows/ci.yml`.
 
 ### Changing a price
 
@@ -112,6 +127,9 @@ From the brand guidelines deck:
 Headings use *JCEM Semibold* where available, falling back to Open Sans
 SemiBold; body copy is Open Sans throughout.
 
+Open Sans is self-hosted in `app/public/fonts/` (Regular, SemiBold, Bold) so
+the PDF never depends on a network fetch at render time.
+
 `app/public/logo-dark.png` is the white-and-teal wordmark for charcoal
 backgrounds; `app/public/logo.png` is the charcoal-and-teal version for white
 backgrounds. Both were extracted from the guidelines deck with transparent
@@ -123,11 +141,13 @@ backgrounds — swap in official artwork if you get the vector files.
 
 ```
 app/src/
-  domain/     rate card, invoice model, totals, dates, validation
-  export/     ooxml.ts (surgical SpreadsheetML editing), xlsx.ts (the writer)
+  domain/     rate card, invoice model, totals, dates, validation (+ tests)
+  export/     ooxml.ts (surgical SpreadsheetML editing), xlsx.ts (the writer),
+              pdf.tsx (the branded PDF)
   store/      StorageAdapter interface + LocalStorageAdapter
   mail/       MailAdapter interface + Gmail / mailto adapters
   ui/         screens and components
+app/scripts/  template scrubber and the two verification harnesses
 ```
 
 The Excel writer deliberately does **not** parse and re-serialise the workbook

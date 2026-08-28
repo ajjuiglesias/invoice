@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Typecheck, test and verify the Excel writer
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # The scrubbed template is committed, and make-template no-ops when no
+      # source invoice is present — so this works without the real invoices.
+      - name: Prepare template
+        run: npm run template
+
+      - name: Typecheck
+        run: npx tsc -b
+
+      - name: Unit tests
+        run: npm run test
+
+      # Rebuilds a real past invoice and checks it cell by cell against the
+      # company's template. This is the one that must never go red.
+      - name: Verify the Excel writer
+        run: npm run verify
+
+      # Renders the branded PDF and checks fonts, links and pagination.
+      - name: Verify the PDF
+        run: npm run verify:pdf
+
+      - name: Build
+        run: npx vite build
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: app/dist
+          retention-days: 7
