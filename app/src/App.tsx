@@ -1,21 +1,53 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { teamMode } from './config';
 import { COMPANY } from './domain/company';
 import { isoDate, monthKey, nextMonth } from './domain/invoice';
-import { RATE_CARD_VERSION } from './domain/rate-card';
+import {
+  activeRateCardVersion,
+  RATE_CARD_VERSION,
+  setActiveRateCard,
+  type RateItem,
+} from './domain/rate-card';
+import { isEditable, type InvoiceStatus, type Role } from './domain/status';
 import { EMPTY_PROFILE, type FreelancerProfile, type Invoice, type InvoiceLine } from './domain/types';
 import { validateLine, validateProfile } from './domain/validation';
+import type { CurrentUser, StorageAdapter, TeamAdapter, TeamMember } from './store/adapter';
 import { LocalStorageAdapter, storageAvailable } from './store/local';
-import type { StorageAdapter } from './store/adapter';
+import { migrateLocalData } from './store/migrate';
+import { AdminScreen } from './ui/AdminScreen';
+import { AuthScreen } from './ui/AuthScreen';
 import { BuilderScreen } from './ui/BuilderScreen';
+import { Notice } from './ui/components';
 import { DetailsScreen } from './ui/DetailsScreen';
 import { HistoryScreen } from './ui/HistoryScreen';
+import { ReviewQueueScreen } from './ui/ReviewQueueScreen';
 import { ReviewScreen } from './ui/ReviewScreen';
 
-type Step = 'details' | 'build' | 'review' | 'history';
+type Step = 'details' | 'build' | 'review' | 'history' | 'approvals' | 'admin';
 
-const storage: StorageAdapter = new LocalStorageAdapter();
+/**
+ * One backend or the other, chosen once at start-up.
+ *
+ * Without Supabase credentials this is Phase A exactly: everything in the
+ * browser, no accounts, nothing uploaded — and the Supabase client is never
+ * even downloaded, because the import below only runs in team mode.
+ */
+let cloud: (StorageAdapter & TeamAdapter) | null = null;
+let storage: StorageAdapter = new LocalStorageAdapter();
 
-/** The month you are normally invoicing is the one you are in. */
+let backendPromise: Promise<void> | null = null;
+
+function initBackend(): Promise<void> {
+  if (!teamMode) return Promise.resolve();
+  if (!backendPromise) {
+    backendPromise = import('./store/supabase').then(({ SupabaseAdapter }) => {
+      cloud = new SupabaseAdapter(RATE_CARD_VERSION);
+      storage = cloud;
+    });
+  }
+  return backendPromise;
+}
+
 function defaultPeriod(): string {
   return monthKey(new Date());
 }
@@ -23,6 +55,14 @@ function defaultPeriod(): string {
 export default function App() {
   const [ready, setReady] = useState(false);
   const [step, setStep] = useState<Step>('details');
+  const [banner, setBanner] = useState<string | null>(null);
+
+  // Team mode only.
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [authChecked, setAuthChecked] = useState(!teamMode);
+  const [queue, setQueue] = useState<Invoice[]>([]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [teamBusy, setTeamBusy] = useState(false);
 
   const [profile, setProfile] = useState<FreelancerProfile>(EMPTY_PROFILE);
   const [lines, setLines] = useState<InvoiceLine[]>([]);
@@ -30,16 +70,62 @@ export default function App() {
   const [issueDate, setIssueDate] = useState(() => isoDate(new Date()));
   const [periodMonth, setPeriodMonth] = useState(defaultPeriod);
   const [invoiceId, setInvoiceId] = useState(() => newId());
+  const [status, setStatus] = useState<InvoiceStatus>('draft');
   const [history, setHistory] = useState<Invoice[]>([]);
 
   const persists = useMemo(storageAvailable, []);
   const hydrated = useRef(false);
 
+  const role: Role = user?.role ?? 'freelancer';
+  const canReview = role === 'manager' || role === 'accounts' || role === 'admin';
+  const isAdmin = role === 'admin';
+
+  // ---- Authentication ------------------------------------------------------
+  useEffect(() => {
+    if (!teamMode) return;
+    let unsubscribe: (() => void) | undefined;
+
+    void initBackend().then(async () => {
+      if (!cloud) return;
+
+      setUser(await cloud.currentUser());
+      setAuthChecked(true);
+
+      unsubscribe = cloud.onAuthChange(() => {
+        void cloud?.currentUser().then(setUser);
+      });
+    });
+
+    return () => unsubscribe?.();
+  }, []);
+
   // ---- Load saved state ----------------------------------------------------
   useEffect(() => {
+    if (teamMode && !user) return;
     let cancelled = false;
 
     (async () => {
+      hydrated.current = false;
+
+      if (cloud && user) {
+        // Published rates win over the ones compiled into the app.
+        try {
+          const published = await cloud.loadPublishedRateCard();
+          if (published) setActiveRateCard(published.items, published.version);
+        } catch {
+          // Fall back to the built-in card rather than block sign-in.
+        }
+
+        const moved = await migrateLocalData(cloud);
+        if (moved.migrated && !cancelled) {
+          setBanner(
+            `Brought your existing work across: ${moved.invoices} invoice${
+              moved.invoices === 1 ? '' : 's'
+            }${moved.profile ? ' and your details' : ''}.`,
+          );
+        }
+      }
+
       const [savedProfile, draft, invoices, next] = await Promise.all([
         storage.loadProfile(),
         storage.loadDraft(),
@@ -60,7 +146,6 @@ export default function App() {
         setInvoiceNumber(next);
       }
 
-      // Land people on the first screen that still needs them.
       if (savedProfile && validateProfile(savedProfile).every((i) => i.severity !== 'error')) {
         setStep('build');
       }
@@ -72,7 +157,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user]);
 
   // ---- Persist as you go ---------------------------------------------------
   useEffect(() => {
@@ -94,25 +179,112 @@ export default function App() {
       periodMonth,
       profile,
       lines,
-      rateCardVersion: RATE_CARD_VERSION,
+      rateCardVersion: activeRateCardVersion(),
       createdAt: new Date().toISOString(),
+      status,
+      freelancerId: user?.id,
     }),
-    [invoiceId, invoiceNumber, issueDate, periodMonth, profile, lines],
+    [invoiceId, invoiceNumber, issueDate, periodMonth, profile, lines, status, user?.id],
   );
 
   const detailsComplete = validateProfile(profile).every((i) => i.severity !== 'error');
   const linesComplete =
     lines.length > 0 && lines.every((l) => validateLine(l).every((i) => i.severity !== 'error'));
 
+  // ---- Actions -------------------------------------------------------------
   const recordInvoice = useCallback(async (finished: Invoice) => {
     await storage.saveInvoice(finished);
     setHistory(await storage.listInvoices());
   }, []);
 
-  const rekey = (lines: InvoiceLine[]) =>
-    lines.map((l) => ({ ...l, key: `${l.rateItemId}-${Date.now()}-${Math.random()}` }));
+  const refreshQueue = useCallback(async () => {
+    if (!cloud) return;
+    setTeamBusy(true);
+    try {
+      setQueue(await cloud.listForReview());
+    } finally {
+      setTeamBusy(false);
+    }
+  }, []);
 
-  /** Load a past invoice back for correction. Keeps its identity and number. */
+  const refreshMembers = useCallback(async () => {
+    if (!cloud) return;
+    setTeamBusy(true);
+    try {
+      setMembers(await cloud.listMembers());
+    } finally {
+      setTeamBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (step === 'approvals') void refreshQueue();
+    if (step === 'admin') void refreshMembers();
+  }, [step, refreshQueue, refreshMembers]);
+
+  const submitForApproval = useCallback(async () => {
+    if (!cloud) return;
+    setTeamBusy(true);
+    try {
+      await storage.saveInvoice(invoice);
+      await cloud.setStatus(invoice.id, 'submitted');
+      setStatus('submitted');
+      setHistory(await storage.listInvoices());
+      setBanner('Submitted for approval.');
+      setStep('history');
+    } catch (error) {
+      setBanner(error instanceof Error ? error.message : 'Could not submit the invoice.');
+    } finally {
+      setTeamBusy(false);
+    }
+  }, [invoice]);
+
+  const decide = useCallback(
+    async (target: Invoice, to: InvoiceStatus, note?: string) => {
+      if (!cloud) return;
+      setTeamBusy(true);
+      try {
+        await cloud.setStatus(target.id, to, note);
+        setQueue(await cloud.listForReview());
+      } catch (error) {
+        setBanner(error instanceof Error ? error.message : 'Could not update that invoice.');
+      } finally {
+        setTeamBusy(false);
+      }
+    },
+    [],
+  );
+
+  const publishRateCard = useCallback(async (version: string, items: RateItem[]) => {
+    if (!cloud) return;
+    setTeamBusy(true);
+    try {
+      await cloud.publishRateCard(version, items);
+      setActiveRateCard(items, version);
+    } finally {
+      setTeamBusy(false);
+    }
+  }, []);
+
+  const setMemberRole = useCallback(
+    async (memberId: string, next: Role) => {
+      if (!cloud) return;
+      setTeamBusy(true);
+      try {
+        await cloud.setRole(memberId, next);
+        setMembers(await cloud.listMembers());
+      } catch (error) {
+        setBanner(error instanceof Error ? error.message : 'Could not change that role.');
+      } finally {
+        setTeamBusy(false);
+      }
+    },
+    [],
+  );
+
+  const rekey = (source: InvoiceLine[]) =>
+    source.map((l) => ({ ...l, key: `${l.rateItemId}-${Date.now()}-${Math.random()}` }));
+
   const editInvoice = useCallback((old: Invoice) => {
     setProfile(old.profile);
     setLines(rekey(old.lines));
@@ -120,14 +292,10 @@ export default function App() {
     setIssueDate(old.issueDate);
     setInvoiceNumber(old.invoiceNumber);
     setInvoiceId(old.id);
+    setStatus(old.status ?? 'draft');
     setStep('build');
   }, []);
 
-  /**
-   * Start a fresh invoice from an old one: same task types and quantities, but
-   * a new identity, the next number, the following month, and — crucially —
-   * no links, because those belong to last month's pieces of work.
-   */
   const copyToNewMonth = useCallback(async (old: Invoice) => {
     setProfile(old.profile);
     setLines(rekey(old.lines).map((l) => ({ ...l, asanaLinks: [''], pageLinks: [''] })));
@@ -135,6 +303,7 @@ export default function App() {
     setIssueDate(isoDate(new Date()));
     setInvoiceNumber(await storage.nextInvoiceNumber());
     setInvoiceId(newId());
+    setStatus('draft');
     setStep('build');
   }, []);
 
@@ -146,6 +315,7 @@ export default function App() {
     setPeriodMonth(defaultPeriod());
     setIssueDate(isoDate(new Date()));
     setInvoiceNumber(await storage.nextInvoiceNumber());
+    setStatus('draft');
     await storage.saveDraft(null);
     setStep('build');
   }, [lines.length]);
@@ -154,6 +324,33 @@ export default function App() {
     await storage.deleteInvoice(id);
     setHistory(await storage.listInvoices());
   }, []);
+
+  const signOut = useCallback(async () => {
+    await cloud?.signOut();
+    setUser(null);
+    setReady(false);
+  }, []);
+
+  // ---- Render --------------------------------------------------------------
+
+  if (teamMode && !authChecked) {
+    return (
+      <div className="app">
+        <Topbar />
+        <main>
+          <p className="empty">Loading…</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (teamMode && !user) {
+    return (
+      <div className="app">
+        <AuthScreen onSignIn={(email) => cloud!.signInWithEmail(email)} />
+      </div>
+    );
+  }
 
   if (!ready) {
     return (
@@ -166,11 +363,13 @@ export default function App() {
     );
   }
 
+  const locked = !isEditable(status);
+
   return (
     <div className="app">
-      <Topbar onNew={startNew} />
+      <Topbar onNew={startNew} user={user} onSignOut={() => void signOut()} />
 
-      <nav className="steps no-print" aria-label="Invoice steps">
+      <nav className="steps no-print" aria-label="Sections">
         <StepButton
           n={1}
           label="Your details"
@@ -195,6 +394,26 @@ export default function App() {
           onClick={() => setStep('review')}
         />
         <div className="topbar__spacer" />
+        {canReview && (
+          <button
+            type="button"
+            className="step"
+            aria-current={step === 'approvals'}
+            onClick={() => setStep('approvals')}
+          >
+            Approvals
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            type="button"
+            className="step"
+            aria-current={step === 'admin'}
+            onClick={() => setStep('admin')}
+          >
+            Admin
+          </button>
+        )}
         <button
           type="button"
           className="step"
@@ -206,6 +425,31 @@ export default function App() {
       </nav>
 
       <main>
+        {banner && (
+          <div className="no-print">
+            <Notice tone="info">
+              {banner}{' '}
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                style={{ marginLeft: 8 }}
+                onClick={() => setBanner(null)}
+              >
+                Dismiss
+              </button>
+            </Notice>
+          </div>
+        )}
+
+        {locked && step !== 'approvals' && step !== 'admin' && (
+          <div className="no-print">
+            <Notice tone="warning" title="This invoice is locked. ">
+              It has been submitted, so it cannot be edited. Use <strong>New invoice</strong> to
+              start another.
+            </Notice>
+          </div>
+        )}
+
         {step === 'details' && (
           <DetailsScreen
             profile={profile}
@@ -237,6 +481,8 @@ export default function App() {
             invoice={invoice}
             onBack={() => setStep('build')}
             onRecord={(finished) => void recordInvoice(finished)}
+            onSubmit={teamMode ? () => void submitForApproval() : undefined}
+            submitting={teamBusy}
           />
         )}
 
@@ -244,8 +490,29 @@ export default function App() {
           <HistoryScreen
             invoices={history}
             onEdit={editInvoice}
-            onCopyToNewMonth={(invoice) => void copyToNewMonth(invoice)}
+            onCopyToNewMonth={(inv) => void copyToNewMonth(inv)}
             onDelete={(id) => void removeFromHistory(id)}
+          />
+        )}
+
+        {step === 'approvals' && canReview && (
+          <ReviewQueueScreen
+            invoices={queue}
+            role={role}
+            currentUserId={user?.id ?? ''}
+            busy={teamBusy}
+            onDecide={decide}
+            onRefresh={() => void refreshQueue()}
+          />
+        )}
+
+        {step === 'admin' && isAdmin && (
+          <AdminScreen
+            members={members}
+            busy={teamBusy}
+            onPublishRateCard={publishRateCard}
+            onSetRole={setMemberRole}
+            onRefresh={() => void refreshMembers()}
           />
         )}
       </main>
@@ -255,15 +522,37 @@ export default function App() {
 
 // ---------------------------------------------------------------------------
 
-function Topbar({ onNew }: { onNew?: () => void }) {
+function Topbar({
+  onNew,
+  user,
+  onSignOut,
+}: {
+  onNew?: () => void;
+  user?: CurrentUser | null;
+  onSignOut?: () => void;
+}) {
   return (
     <header className="topbar no-print">
       <img className="topbar__logo" src="logo-dark.png" alt={COMPANY.name} />
       <span className="topbar__title">Freelancer Invoicing</span>
       <div className="topbar__spacer" />
+
+      {user && (
+        <span className="whoami">
+          {user.email}
+          <span className="whoami__role">{user.role}</span>
+        </span>
+      )}
+
       {onNew && (
         <button type="button" className="btn btn--ghost btn--sm" onClick={onNew}>
           New invoice
+        </button>
+      )}
+
+      {user && onSignOut && (
+        <button type="button" className="btn btn--ghost btn--sm" onClick={onSignOut}>
+          Sign out
         </button>
       )}
     </header>
@@ -302,5 +591,7 @@ function StepButton({
 }
 
 function newId(): string {
-  return `inv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `inv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }

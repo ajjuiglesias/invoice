@@ -5,8 +5,13 @@ completed, attach the Asana task and published page for each, and it produces
 **the company's own Excel template, filled in** plus a **branded PDF**, ready to
 email to your line manager.
 
-No server, no accounts, no database. Everything runs in the browser and your
-details never leave your computer.
+Runs in two modes. By default there is **no server, no accounts and no
+database** — everything happens in the browser and nothing is uploaded. Add
+Supabase credentials and the same app becomes a **team platform**: logins,
+shared invoice history, an in-app approval queue for the line manager, and an
+admin-editable rate card. See [docs/TEAM-MODE.md](docs/TEAM-MODE.md).
+
+Bank details stay on the freelancer's own machine in **both** modes.
 
 ---
 
@@ -147,13 +152,15 @@ backgrounds — swap in official artwork if you get the vector files.
 
 ```
 app/src/
-  domain/     rate card, invoice model, totals, dates, validation (+ tests)
+  domain/     rate card, invoice model, totals, dates, status, validation (+ tests)
   export/     ooxml.ts (surgical SpreadsheetML editing), xlsx.ts (the writer),
               pdf.tsx (the branded PDF)
-  store/      StorageAdapter interface + LocalStorageAdapter
+  store/      StorageAdapter + TeamAdapter interfaces,
+              LocalStorageAdapter and SupabaseAdapter
   mail/       MailAdapter interface + Gmail / mailto adapters
   ui/         screens and components
 app/scripts/  template scrubber and the two verification harnesses
+supabase/     schema, row level security and triggers
 ```
 
 The Excel writer deliberately does **not** parse and re-serialise the workbook
@@ -161,13 +168,15 @@ with a library. It edits the raw XML of only the cells it owns, so the styling,
 merges, logo drawing, printer settings and the *How To* sheet survive exactly as
 the company built them.
 
-### Growing this into a team platform
+### The two modes
 
-Storage and mail both sit behind interfaces (`store/adapter.ts`,
-`mail/gmail.ts`). Adding team logins, shared invoice history, a manager-editable
-rate card and automatic sending means writing two new adapter implementations
-and one admin screen — the domain logic, the Excel writer and every screen stay
-as they are.
+`config.ts` decides, once, from two environment variables. Without them the app
+constructs a `LocalStorageAdapter` and never even downloads the Supabase
+client; with them it dynamically imports `SupabaseAdapter`, which implements
+both `StorageAdapter` and `TeamAdapter`.
+
+The domain layer, the Excel writer, the PDF renderer and all the invoice
+screens are identical in both modes — they only ever talk to the interfaces.
 
 ---
 

@@ -13,11 +13,14 @@ interface Props {
   invoice: Invoice;
   onBack: () => void;
   onRecord: (invoice: Invoice) => void;
+  /** Team mode only: submit to the line manager instead of emailing. */
+  onSubmit?: () => void;
+  submitting?: boolean;
 }
 
 type Status = { tone: 'info' | 'error'; text: string } | null;
 
-export function ReviewScreen({ invoice, onBack, onRecord }: Props) {
+export function ReviewScreen({ invoice, onBack, onRecord, onSubmit, submitting }: Props) {
   const [busy, setBusy] = useState(false);
   const [busyPdf, setBusyPdf] = useState(false);
   const [status, setStatus] = useState<Status>(null);
@@ -196,8 +199,31 @@ export function ReviewScreen({ invoice, onBack, onRecord }: Props) {
           </p>
         </Card>
 
+        {onSubmit && (
+          <Card
+            title="2. Submit for approval"
+            subtitle="Your line manager reviews it here — no email needed"
+          >
+            <div className="actions">
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={onSubmit}
+                disabled={blocked || submitting}
+              >
+                {submitting && <span className="spinner" aria-hidden="true" />}
+                {submitting ? 'Submitting…' : 'Submit for approval'}
+              </button>
+            </div>
+            <p className="small muted" style={{ margin: '12px 0 0' }}>
+              Once submitted the invoice is locked. Your manager can approve it or send it back
+              with a note.
+            </p>
+          </Card>
+        )}
+
         <Card
-          title="2. Send it"
+          title={onSubmit ? 'Or send it by email' : '2. Send it'}
           subtitle={`To ${RECIPIENTS.to}, copying ${RECIPIENTS.cc}`}
         >
           {!downloaded && (

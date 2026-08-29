@@ -11,3 +11,7 @@ dist/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Local environment overrides
+.env.local
+.env*.local

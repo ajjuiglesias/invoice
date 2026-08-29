@@ -330,7 +330,41 @@ export const RATE_CARD: RateItem[] = [
 export const FIRST_ITEM_ROW = 19;
 export const LAST_ITEM_ROW = 47;
 
-const byId = new Map(RATE_CARD.map((r) => [r.id, r]));
+/**
+ * The card currently in force. In Phase A this is always RATE_CARD above. In
+ * team mode the published card is loaded from the database at boot and swapped
+ * in here, so every caller keeps working unchanged.
+ */
+let activeCard: RateItem[] = RATE_CARD;
+let activeVersion = RATE_CARD_VERSION;
+let byId = new Map(activeCard.map((r) => [r.id, r]));
+
+/** Replace the card in force. Called once at start-up, before anything renders. */
+export function setActiveRateCard(items: RateItem[], version: string): void {
+  if (items.length === 0) throw new Error('Refusing to activate an empty rate card.');
+
+  const rows = new Set(items.map((i) => i.row));
+  if (rows.size !== items.length) {
+    throw new Error('Rate card has two task types on the same template row.');
+  }
+  for (const item of items) {
+    if (item.row < FIRST_ITEM_ROW || item.row > LAST_ITEM_ROW) {
+      throw new Error(`Rate card row ${item.row} (${item.id}) is outside the template's item rows.`);
+    }
+  }
+
+  activeCard = items;
+  activeVersion = version;
+  byId = new Map(items.map((r) => [r.id, r]));
+}
+
+export function activeRateCard(): RateItem[] {
+  return activeCard;
+}
+
+export function activeRateCardVersion(): string {
+  return activeVersion;
+}
 
 export function rateItem(id: string): RateItem | undefined {
   return byId.get(id);
@@ -339,6 +373,6 @@ export function rateItem(id: string): RateItem | undefined {
 export function rateItemsByGroup(): Array<{ group: Group; items: RateItem[] }> {
   return GROUPS.map((group) => ({
     group,
-    items: RATE_CARD.filter((r) => r.group === group),
+    items: activeCard.filter((r) => r.group === group),
   })).filter((g) => g.items.length > 0);
 }

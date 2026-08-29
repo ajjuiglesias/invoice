@@ -1,3 +1,5 @@
+import type { InvoiceStatus } from './status';
+
 /** Core data shapes. Deliberately plain — these are persisted as JSON. */
 
 /** Saved once per freelancer, reused on every invoice. */
@@ -50,6 +52,17 @@ export interface Invoice {
   rateCardVersion: string;
   /** ISO timestamp. */
   createdAt: string;
+
+  // ---- Team mode only. Undefined when running without a backend. ----------
+
+  /** Where the invoice sits in the approval flow. */
+  status?: InvoiceStatus;
+  /** Profile id of the freelancer who raised it. */
+  freelancerId?: string;
+  /** Note left by the manager when requesting changes. */
+  decisionNote?: string;
+  submittedAt?: string;
+  decidedAt?: string;
 }
 
 export const EMPTY_BANK: BankDetails = {
