@@ -1,21 +1,25 @@
-import { formatDate, formatGBP, monthLabel, subtotal } from '../domain/invoice';
+import { formatDate, formatGBP, monthLabel, nextMonth, subtotal } from '../domain/invoice';
 import type { Invoice } from '../domain/types';
 import { Card, Notice } from './components';
 
 interface Props {
   invoices: Invoice[];
-  onReopen: (invoice: Invoice) => void;
+  /** Load it back as-is, keeping its number, to correct a mistake. */
+  onEdit: (invoice: Invoice) => void;
+  /** Start next month's invoice from this one's task types. */
+  onCopyToNewMonth: (invoice: Invoice) => void;
   onDelete: (id: string) => void;
 }
 
-export function HistoryScreen({ invoices, onReopen, onDelete }: Props) {
+export function HistoryScreen({ invoices, onEdit, onCopyToNewMonth, onDelete }: Props) {
   return (
     <>
       <div className="screen-head">
         <h1>Past invoices</h1>
         <p>
-          Every invoice you have generated on this computer. Reopen one to use it as the starting
-          point for a new month.
+          Every invoice you have generated on this computer. <strong>Copy to next month</strong>
+          reuses the task types and quantities with fresh links and a new number;{' '}
+          <strong>Edit</strong> reopens an invoice in place to correct it.
         </p>
       </div>
 
@@ -50,9 +54,18 @@ export function HistoryScreen({ invoices, onReopen, onDelete }: Props) {
                     <button
                       type="button"
                       className="btn btn--ghost btn--sm"
-                      onClick={() => onReopen(invoice)}
+                      onClick={() => onCopyToNewMonth(invoice)}
+                      title={`Start ${monthLabel(nextMonth(invoice.periodMonth))} from this invoice`}
                     >
-                      Reopen
+                      Copy to {monthLabel(nextMonth(invoice.periodMonth)).split(' ')[0]}
+                    </button>{' '}
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => onEdit(invoice)}
+                      title="Reopen this invoice to correct it"
+                    >
+                      Edit
                     </button>{' '}
                     <button
                       type="button"

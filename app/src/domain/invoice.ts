@@ -1,3 +1,4 @@
+import { isWorkingDay } from './bank-holidays';
 import { NOTICE_WORKING_DAYS } from './company';
 import { rateItem } from './rate-card';
 import type { Invoice, InvoiceLine } from './types';
@@ -38,6 +39,12 @@ export function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/** The yyyy-mm key one month on from the given one. */
+export function nextMonth(key: string): string {
+  const [y, m] = key.split('-').map(Number);
+  return monthKey(new Date(y, m, 1));
+}
+
 /** Human month, e.g. "August 2026". */
 export function monthLabel(key: string): string {
   const [y, m] = key.split('-').map(Number);
@@ -68,17 +75,12 @@ export function formatDate(iso: string): string {
   });
 }
 
-function isWeekend(d: Date): boolean {
-  const day = d.getDay();
-  return day === 0 || day === 6;
-}
-
 /**
  * The company requires invoices at least 5 working days before the last day of
  * the month. Returns that deadline date for the given yyyy-mm period.
  *
- * Note: this counts weekends only — UK bank holidays are not accounted for, so
- * treat the deadline as the latest possible date, not a comfortable one.
+ * Weekends and England & Wales bank holidays are both skipped, so the date is
+ * the genuine last working day rather than an optimistic one.
  */
 export function submissionDeadline(periodMonth: string): Date {
   const [y, m] = periodMonth.split('-').map(Number);
@@ -86,7 +88,7 @@ export function submissionDeadline(periodMonth: string): Date {
   let remaining = NOTICE_WORKING_DAYS;
   while (remaining > 0) {
     cursor.setDate(cursor.getDate() - 1);
-    if (!isWeekend(cursor)) remaining -= 1;
+    if (isWorkingDay(cursor)) remaining -= 1;
   }
   return cursor;
 }

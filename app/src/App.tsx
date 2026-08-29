@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { COMPANY } from './domain/company';
-import { isoDate, monthKey } from './domain/invoice';
+import { isoDate, monthKey, nextMonth } from './domain/invoice';
 import { RATE_CARD_VERSION } from './domain/rate-card';
 import { EMPTY_PROFILE, type FreelancerProfile, type Invoice, type InvoiceLine } from './domain/types';
 import { validateLine, validateProfile } from './domain/validation';
@@ -109,13 +109,32 @@ export default function App() {
     setHistory(await storage.listInvoices());
   }, []);
 
-  const reopen = useCallback((old: Invoice) => {
+  const rekey = (lines: InvoiceLine[]) =>
+    lines.map((l) => ({ ...l, key: `${l.rateItemId}-${Date.now()}-${Math.random()}` }));
+
+  /** Load a past invoice back for correction. Keeps its identity and number. */
+  const editInvoice = useCallback((old: Invoice) => {
     setProfile(old.profile);
-    setLines(old.lines.map((l) => ({ ...l, key: `${l.rateItemId}-${Date.now()}-${Math.random()}` })));
+    setLines(rekey(old.lines));
     setPeriodMonth(old.periodMonth);
     setIssueDate(old.issueDate);
     setInvoiceNumber(old.invoiceNumber);
     setInvoiceId(old.id);
+    setStep('build');
+  }, []);
+
+  /**
+   * Start a fresh invoice from an old one: same task types and quantities, but
+   * a new identity, the next number, the following month, and — crucially —
+   * no links, because those belong to last month's pieces of work.
+   */
+  const copyToNewMonth = useCallback(async (old: Invoice) => {
+    setProfile(old.profile);
+    setLines(rekey(old.lines).map((l) => ({ ...l, asanaLinks: [''], pageLinks: [''] })));
+    setPeriodMonth(nextMonth(old.periodMonth));
+    setIssueDate(isoDate(new Date()));
+    setInvoiceNumber(await storage.nextInvoiceNumber());
+    setInvoiceId(newId());
     setStep('build');
   }, []);
 
@@ -224,7 +243,8 @@ export default function App() {
         {step === 'history' && (
           <HistoryScreen
             invoices={history}
-            onReopen={reopen}
+            onEdit={editInvoice}
+            onCopyToNewMonth={(invoice) => void copyToNewMonth(invoice)}
             onDelete={(id) => void removeFromHistory(id)}
           />
         )}

@@ -24,6 +24,11 @@ details never leave your computer.
    `accounts@juliacharles.co.uk` copied in, subject and body written. Attach the
    two files and send.
 
+Next month, open **Past invoices** and hit **Copy to ‹month›**. You get the same
+task types and quantities with a fresh invoice number and empty link fields —
+ready for the new month's work. **Edit** reopens an invoice in place instead, for
+correcting one you have already generated.
+
 Both files download directly — no print dialog. The PDF is a real vector PDF
 with Open Sans embedded, so the text stays selectable and the Asana and page
 links stay clickable for whoever reviews it.
@@ -36,7 +41,8 @@ Taken from the template's own *How To* sheet:
 - Every line needs an Asana link **and** the published page link.
 - Only invoice work signed off by your line manager.
 - Submit at least **5 working days before the last day of the month** — the app
-  works this date out for you and warns as it approaches.
+  works this date out for you, skipping weekends and bank holidays, and warns as
+  it approaches.
 
 ---
 
@@ -171,7 +177,8 @@ as they are.
   fixed `SUM(J19:J47)`, so quantities are used rather than duplicated rows. Where
   a line covers several pieces of work, every link is listed in the cell and the
   first is made clickable — Excel allows only one hyperlink per cell.
-- **The deadline calculation counts weekends only**, not UK bank holidays, so
-  treat it as the latest possible date rather than a comfortable one.
+- **Bank holidays are computed, not listed** — England & Wales only, and
+  one-off holidays granted by royal proclamation must be added by hand to
+  `EXTRA_HOLIDAYS` in `app/src/domain/bank-holidays.ts`.
 - **History lives in one browser.** Clearing site data clears the list. The
   downloaded files are the real record.
