@@ -30,7 +30,7 @@ export function buildMessage(invoice: Invoice, fileNames: string[]): MailMessage
   const subject = `Invoice #${invoice.invoiceNumber} — ${period} — ${who}`;
 
   const body = [
-    'Hi Kim,',
+    RECIPIENTS.greeting,
     '',
     `Please find attached my invoice for ${period}.`,
     '',
@@ -45,7 +45,7 @@ export function buildMessage(invoice: Invoice, fileNames: string[]): MailMessage
       ? `Attached: ${fileNames.join(', ')}`
       : 'The invoice is attached.',
     '',
-    'Please let me know if you need anything else before this goes to accounts.',
+    'Please let me know if you need anything else to process this.',
     '',
     'Many thanks,',
     invoice.profile.fullName.trim() || who,

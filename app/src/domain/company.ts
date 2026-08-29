@@ -15,9 +15,12 @@ export const COMPANY = {
 } as const;
 
 export const RECIPIENTS = {
-  /** Line manager — invoices go here first for approval. */
-  to: 'kim@juliacharles.co.uk',
-  cc: 'accounts@juliacharles.co.uk',
+  /** Accounts receive the invoice directly. */
+  to: 'accounts@juliacharles.co.uk',
+  /** Copied in for approval and visibility. */
+  cc: 'stacy@juliacharles.co.uk',
+  /** Opening line of the covering email. */
+  greeting: 'Hi,',
 } as const;
 
 /** Brand palette, straight from the brand guidelines deck. */

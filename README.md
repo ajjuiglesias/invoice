@@ -20,8 +20,8 @@ details never leave your computer.
    The app checks as you go: it flags missing links, preview/draft URLs, and the
    same Asana task being invoiced twice.
 4. **Review & send** — download the two files, then click **Open in Gmail**. The
-   email is pre-addressed to `kim@juliacharles.co.uk` with
-   `accounts@juliacharles.co.uk` copied in, subject and body written. Attach the
+   email is pre-addressed to `accounts@juliacharles.co.uk` with
+   `stacy@juliacharles.co.uk` copied in, subject and body written. Attach the
    two files and send.
 
 Next month, open **Past invoices** and hit **Copy to ‹month›**. You get the same
