@@ -14,6 +14,7 @@ import { validateLine, validateProfile } from './domain/validation';
 import type { CurrentUser, StorageAdapter, TeamAdapter, TeamMember } from './store/adapter';
 import { LocalStorageAdapter, storageAvailable } from './store/local';
 import { migrateLocalData } from './store/migrate';
+import { AccountsScreen } from './ui/AccountsScreen';
 import { AdminScreen } from './ui/AdminScreen';
 import { AuthScreen } from './ui/AuthScreen';
 import { BuilderScreen } from './ui/BuilderScreen';
@@ -23,7 +24,7 @@ import { HistoryScreen } from './ui/HistoryScreen';
 import { ReviewQueueScreen } from './ui/ReviewQueueScreen';
 import { ReviewScreen } from './ui/ReviewScreen';
 
-type Step = 'details' | 'build' | 'review' | 'history' | 'approvals' | 'admin';
+type Step = 'details' | 'build' | 'review' | 'history' | 'approvals' | 'accounts' | 'admin';
 
 /**
  * One backend or the other, chosen once at start-up.
@@ -78,6 +79,7 @@ export default function App() {
 
   const role: Role = user?.role ?? 'freelancer';
   const canReview = role === 'manager' || role === 'accounts' || role === 'admin';
+  const seesAccounts = role === 'accounts' || role === 'admin';
   const isAdmin = role === 'admin';
 
   // ---- Authentication ------------------------------------------------------
@@ -220,6 +222,10 @@ export default function App() {
   useEffect(() => {
     if (step === 'approvals') void refreshQueue();
     if (step === 'admin') void refreshMembers();
+    if (step === 'accounts') {
+      void refreshQueue();
+      void refreshMembers();
+    }
   }, [step, refreshQueue, refreshMembers]);
 
   const submitForApproval = useCallback(async () => {
@@ -404,6 +410,16 @@ export default function App() {
             Approvals
           </button>
         )}
+        {seesAccounts && (
+          <button
+            type="button"
+            className="step"
+            aria-current={step === 'accounts'}
+            onClick={() => setStep('accounts')}
+          >
+            Accounts
+          </button>
+        )}
         {isAdmin && (
           <button
             type="button"
@@ -441,7 +457,7 @@ export default function App() {
           </div>
         )}
 
-        {locked && step !== 'approvals' && step !== 'admin' && (
+        {locked && step !== 'approvals' && step !== 'admin' && step !== 'accounts' && (
           <div className="no-print">
             <Notice tone="warning" title="This invoice is locked. ">
               It has been submitted, so it cannot be edited. Use <strong>New invoice</strong> to
@@ -503,6 +519,18 @@ export default function App() {
             busy={teamBusy}
             onDecide={decide}
             onRefresh={() => void refreshQueue()}
+          />
+        )}
+
+        {step === 'accounts' && seesAccounts && (
+          <AccountsScreen
+            invoices={queue}
+            members={members}
+            busy={teamBusy}
+            onRefresh={() => {
+              void refreshQueue();
+              void refreshMembers();
+            }}
           />
         )}
 

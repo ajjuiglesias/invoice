@@ -78,7 +78,7 @@ Sign-in links come from whatever address you configure there, so a
 | --- | --- | --- |
 | `freelancer` | Own invoices | Build, submit |
 | `manager` | Everything submitted | Approve, request changes |
-| `accounts` | Approved onwards | Mark sent, mark paid |
+| `accounts` | Approved onwards | Mark sent, mark paid, see the Accounts view |
 | `admin` | Everything | Everything, plus rates and roles |
 
 The rules are enforced by row-level security and a database trigger, not by the
@@ -127,9 +127,26 @@ The first time someone signs in, any profile and invoice history already in
 that browser is copied up automatically, once. It never overwrites something
 already in the cloud, and the local copy is left untouched.
 
+## The Accounts view
+
+Visible to `accounts` and `admin`. It answers the month-end questions:
+
+- **What is owed** — three tiles: awaiting approval, approved but not sent, and
+  sent but not paid, each with a count and a total.
+- **By month** — every period with its status breakdown. Select one to scope
+  the two panels below.
+- **By freelancer** — who invoiced what for the selected month.
+- **Not yet invoiced** — freelancers with nothing submitted for that month,
+  which is the chase list.
+- **Export CSV** — one row per invoice line, ready for a finance system. It is
+  written UTF-8 with a byte-order mark so Excel reads the pound signs
+  correctly, and commas in names are quoted properly.
+
+The figures only ever cover invoices the signed-in person is allowed to see,
+because they come through the same row-level security as everything else.
+
 ## What is not built yet
 
 - **Automatic sending to accounts on approval** (B4 in the plan). Approved
   invoices still go by the existing Gmail hand-off. This needs a verified
-  sending domain.
-- **Accounts reporting** (B5) — monthly totals, who has not invoiced.
+  sending domain — see the DNS question in §1 of PLAN-PHASE-B.md.
