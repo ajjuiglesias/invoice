@@ -165,8 +165,14 @@ export default function App() {
         setInvoiceNumber(next);
       }
 
-      if (savedProfile && validateProfile(savedProfile).every((i) => i.severity !== 'error')) {
+      if (user?.role === 'admin' || user?.role === 'manager') {
+        setStep('approvals');
+      } else if (user?.role === 'accounts') {
+        setStep('accounts');
+      } else if (savedProfile && validateProfile(savedProfile).every((i) => i.severity !== 'error')) {
         setStep('build');
+      } else {
+        setStep('details');
       }
 
         hydrated.current = true;
