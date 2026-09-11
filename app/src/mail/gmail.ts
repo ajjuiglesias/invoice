@@ -64,7 +64,9 @@ export class GmailComposeAdapter implements MailAdapter {
     url.searchParams.set('view', 'cm');
     url.searchParams.set('fs', '1');
     url.searchParams.set('to', message.to);
-    url.searchParams.set('cc', message.cc);
+    if (message.cc) {
+      url.searchParams.set('cc', message.cc);
+    }
     url.searchParams.set('su', message.subject);
     url.searchParams.set('body', message.body);
     window.open(url.toString(), '_blank', 'noopener,noreferrer');
@@ -76,24 +78,24 @@ export class MailtoAdapter implements MailAdapter {
   readonly kind = 'compose' as const;
 
   deliver(message: MailMessage): void {
-    const params = new URLSearchParams({
-      cc: message.cc,
-      subject: message.subject,
-      body: message.body,
-    });
+    const params = new URLSearchParams();
+    if (message.cc) {
+      params.set('cc', message.cc);
+    }
+    params.set('subject', message.subject);
+    params.set('body', message.body);
     window.location.href = `mailto:${encodeURIComponent(message.to)}?${params.toString()}`;
   }
 }
 
 /** Plain-text version of the covering note, for copying by hand. */
 export function messageAsText(message: MailMessage): string {
-  return [
-    `To: ${message.to}`,
-    `Cc: ${message.cc}`,
-    `Subject: ${message.subject}`,
-    '',
-    message.body,
-  ].join('\n');
+  const lines: string[] = [`To: ${message.to}`];
+  if (message.cc) {
+    lines.push(`Cc: ${message.cc}`);
+  }
+  lines.push(`Subject: ${message.subject}`, '', message.body);
+  return lines.join('\n');
 }
 
 export const COMPANY_NAME = COMPANY.name;

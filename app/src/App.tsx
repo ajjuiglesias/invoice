@@ -8,13 +8,14 @@ import {
   setActiveRateCard,
   type RateItem,
 } from './domain/rate-card';
-import { isEditable, type InvoiceStatus, type Role } from './domain/status';
+import { isEditable, needsDecision, type InvoiceStatus, type Role } from './domain/status';
 import { EMPTY_PROFILE, type FreelancerProfile, type Invoice, type InvoiceLine } from './domain/types';
 import { validateLine, validateProfile } from './domain/validation';
 import type { CurrentUser, StorageAdapter, TeamAdapter, TeamMember } from './store/adapter';
 import { LocalStorageAdapter, storageAvailable } from './store/local';
 import { migrateLocalData } from './store/migrate';
 import { AccountsScreen } from './ui/AccountsScreen';
+import { AdminLayout, type AdminSection } from './ui/AdminLayout';
 import { AdminScreen } from './ui/AdminScreen';
 import { AuthScreen } from './ui/AuthScreen';
 import { BuilderScreen } from './ui/BuilderScreen';
@@ -24,7 +25,7 @@ import { HistoryScreen } from './ui/HistoryScreen';
 import { ReviewQueueScreen } from './ui/ReviewQueueScreen';
 import { ReviewScreen } from './ui/ReviewScreen';
 
-type Step = 'details' | 'build' | 'review' | 'history' | 'approvals' | 'accounts' | 'admin';
+type Step = 'details' | 'build' | 'review' | 'history' | 'approvals' | 'accounts' | 'admin' | 'admin-history';
 
 /**
  * One backend or the other, chosen once at start-up.
@@ -61,6 +62,7 @@ export default function App() {
   // Team mode only.
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [authChecked, setAuthChecked] = useState(!teamMode);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [queue, setQueue] = useState<Invoice[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [teamBusy, setTeamBusy] = useState(false);
@@ -77,26 +79,38 @@ export default function App() {
   const persists = useMemo(storageAvailable, []);
   const hydrated = useRef(false);
 
+  const [adminTab, setAdminTab] = useState<'rates' | 'team'>('rates');
+
   const role: Role = user?.role ?? 'freelancer';
   const canReview = role === 'manager' || role === 'accounts' || role === 'admin';
   const seesAccounts = role === 'accounts' || role === 'admin';
   const isAdmin = role === 'admin';
+  const isStaff = canReview || seesAccounts || isAdmin;
+
+  const pendingApprovalsCount = useMemo(
+    () => queue.filter((i) => needsDecision(i.status ?? 'draft')).length,
+    [queue],
+  );
 
   // ---- Authentication ------------------------------------------------------
   useEffect(() => {
     if (!teamMode) return;
     let unsubscribe: (() => void) | undefined;
 
-    void initBackend().then(async () => {
-      if (!cloud) return;
-
-      setUser(await cloud.currentUser());
-      setAuthChecked(true);
-
-      unsubscribe = cloud.onAuthChange(() => {
-        void cloud?.currentUser().then(setUser);
-      });
-    });
+    void initBackend()
+      .then(async () => {
+        if (!cloud) return;
+        setUser(await cloud.currentUser());
+        unsubscribe = cloud.onAuthChange(() => {
+          void cloud?.currentUser().then(setUser).catch((error) => {
+            setAuthError(error instanceof Error ? error.message : 'Could not verify your session.');
+          });
+        });
+      })
+      .catch((error) => {
+        setAuthError(error instanceof Error ? error.message : 'Could not connect to the invoicing service.');
+      })
+      .finally(() => setAuthChecked(true));
 
     return () => unsubscribe?.();
   }, []);
@@ -106,9 +120,9 @@ export default function App() {
     if (teamMode && !user) return;
     let cancelled = false;
 
-    (async () => {
+    void (async () => {
       hydrated.current = false;
-
+      try {
       if (cloud && user) {
         // Published rates win over the ones compiled into the app.
         try {
@@ -152,8 +166,14 @@ export default function App() {
         setStep('build');
       }
 
-      hydrated.current = true;
-      setReady(true);
+        hydrated.current = true;
+      } catch (error) {
+        if (!cancelled) {
+          setBanner(error instanceof Error ? error.message : 'Could not load your invoice workspace.');
+        }
+      } finally {
+        if (!cancelled) setReady(true);
+      }
     })();
 
     return () => {
@@ -164,12 +184,22 @@ export default function App() {
   // ---- Persist as you go ---------------------------------------------------
   useEffect(() => {
     if (!hydrated.current) return;
-    void storage.saveProfile(profile);
+    const timer = window.setTimeout(() => {
+      void storage.saveProfile(profile).catch((error) => {
+        setBanner(error instanceof Error ? error.message : 'Could not save your details.');
+      });
+    }, 400);
+    return () => window.clearTimeout(timer);
   }, [profile]);
 
   useEffect(() => {
     if (!hydrated.current) return;
-    void storage.saveDraft({ invoiceNumber, issueDate, periodMonth, lines });
+    const timer = window.setTimeout(() => {
+      void storage.saveDraft({ invoiceNumber, issueDate, periodMonth, lines }).catch((error) => {
+        setBanner(error instanceof Error ? error.message : 'Could not save your draft.');
+      });
+    }, 400);
+    return () => window.clearTimeout(timer);
   }, [invoiceNumber, issueDate, periodMonth, lines]);
 
   // ---- Derived -------------------------------------------------------------
@@ -204,6 +234,8 @@ export default function App() {
     setTeamBusy(true);
     try {
       setQueue(await cloud.listForReview());
+    } catch (error) {
+      setBanner(error instanceof Error ? error.message : 'Could not load the approval queue.');
     } finally {
       setTeamBusy(false);
     }
@@ -214,6 +246,8 @@ export default function App() {
     setTeamBusy(true);
     try {
       setMembers(await cloud.listMembers());
+    } catch (error) {
+      setBanner(error instanceof Error ? error.message : 'Could not load the team.');
     } finally {
       setTeamBusy(false);
     }
@@ -332,10 +366,45 @@ export default function App() {
   }, []);
 
   const signOut = useCallback(async () => {
-    await cloud?.signOut();
-    setUser(null);
-    setReady(false);
+    try {
+      await cloud?.signOut();
+      setUser(null);
+      setReady(false);
+    } catch (error) {
+      setBanner(error instanceof Error ? error.message : 'Could not sign out.');
+    }
   }, []);
+
+  const handleAdminNavigate = useCallback(
+    (section: AdminSection) => {
+      if (section === 'approvals') {
+        setStep('approvals');
+      } else if (section === 'accounts') {
+        setStep('accounts');
+      } else if (section === 'admin-rates') {
+        setAdminTab('rates');
+        setStep('admin');
+      } else if (section === 'admin-team') {
+        setAdminTab('team');
+        setStep('admin');
+      } else if (section === 'history') {
+        setStep('admin-history');
+      } else if (section === 'build') {
+        void startNew();
+      }
+    },
+    [startNew],
+  );
+
+  const handleAdminRefresh = useCallback(() => {
+    if (step === 'approvals') void refreshQueue();
+    else if (step === 'accounts') {
+      void refreshQueue();
+      void refreshMembers();
+    } else if (step === 'admin') {
+      void refreshMembers();
+    }
+  }, [step, refreshQueue, refreshMembers]);
 
   // ---- Render --------------------------------------------------------------
 
@@ -353,7 +422,28 @@ export default function App() {
   if (teamMode && !user) {
     return (
       <div className="app">
-        <AuthScreen onSignIn={(email) => cloud!.signInWithEmail(email)} />
+        {authError && <div className="auth-global-error"><Notice tone="error">{authError}</Notice></div>}
+        <AuthScreen
+          onMagicLink={async (email) => {
+            setAuthError(null);
+            if (!cloud) throw new Error('The invoicing service is unavailable. Please refresh and try again.');
+            await cloud.signInWithEmail(email);
+          }}
+          onSignIn={async (email, password) => {
+            setAuthError(null);
+            if (!cloud) throw new Error('The invoicing service is unavailable. Please refresh and try again.');
+            await cloud.signInWithPassword!(email, password);
+            const current = await cloud.currentUser();
+            if (current) setUser(current);
+          }}
+          onSignUp={async (email, password) => {
+            setAuthError(null);
+            if (!cloud) throw new Error('The invoicing service is unavailable. Please refresh and try again.');
+            await cloud.signUpWithPassword!(email, password);
+            const current = await cloud.currentUser();
+            if (current) setUser(current);
+          }}
+        />
       </div>
     );
   }
@@ -369,11 +459,108 @@ export default function App() {
     );
   }
 
+  const inAdminShell =
+    step === 'approvals' || step === 'accounts' || step === 'admin' || step === 'admin-history';
+
+  if (inAdminShell) {
+    const currentAdminSection: AdminSection =
+      step === 'approvals'
+        ? 'approvals'
+        : step === 'accounts'
+        ? 'accounts'
+        : step === 'admin-history'
+        ? 'history'
+        : adminTab === 'team'
+        ? 'admin-team'
+        : 'admin-rates';
+
+    return (
+      <AdminLayout
+        currentSection={currentAdminSection}
+        onNavigate={handleAdminNavigate}
+        user={user}
+        onSignOut={() => void signOut()}
+        pendingApprovalsCount={pendingApprovalsCount}
+        activeRateCardVersion={activeRateCardVersion()}
+        onNewInvoice={() => void startNew()}
+        busy={teamBusy}
+        onRefresh={handleAdminRefresh}
+      >
+        {banner && (
+          <div style={{ marginBottom: 16 }}>
+            <Notice tone="info">
+              {banner}{' '}
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                style={{ marginLeft: 8 }}
+                onClick={() => setBanner(null)}
+              >
+                Dismiss
+              </button>
+            </Notice>
+          </div>
+        )}
+
+        {step === 'approvals' && canReview && (
+          <ReviewQueueScreen
+            invoices={queue}
+            role={role}
+            currentUserId={user?.id ?? ''}
+            busy={teamBusy}
+            onDecide={decide}
+            onRefresh={() => void refreshQueue()}
+          />
+        )}
+
+        {step === 'accounts' && seesAccounts && (
+          <AccountsScreen
+            invoices={queue}
+            members={members}
+            busy={teamBusy}
+            onRefresh={() => {
+              void refreshQueue();
+              void refreshMembers();
+            }}
+          />
+        )}
+
+        {step === 'admin' && isAdmin && (
+          <AdminScreen
+            members={members}
+            busy={teamBusy}
+            onPublishRateCard={publishRateCard}
+            onSetRole={setMemberRole}
+            onRefresh={() => void refreshMembers()}
+            initialTab={adminTab}
+            onTabChange={setAdminTab}
+          />
+        )}
+
+        {step === 'admin-history' && (
+          <HistoryScreen
+            invoices={history}
+            onEdit={editInvoice}
+            onCopyToNewMonth={(inv) => void copyToNewMonth(inv)}
+            onDelete={(id) => void removeFromHistory(id)}
+          />
+        )}
+      </AdminLayout>
+    );
+  }
+
   const locked = !isEditable(status);
 
   return (
     <div className="app">
-      <Topbar onNew={startNew} user={user} onSignOut={() => void signOut()} />
+      <Topbar
+        onNew={startNew}
+        user={user}
+        onSignOut={() => void signOut()}
+        isStaff={isStaff}
+        pendingCount={pendingApprovalsCount}
+        onOpenAdmin={() => setStep(isAdmin ? 'admin' : canReview ? 'approvals' : 'accounts')}
+      />
 
       <nav className="steps no-print" aria-label="Sections">
         <StepButton
@@ -404,17 +591,23 @@ export default function App() {
           <button
             type="button"
             className="step"
-            aria-current={step === 'approvals'}
             onClick={() => setStep('approvals')}
           >
             Approvals
+            {pendingApprovalsCount > 0 && (
+              <span
+                className="admin-nav__counter admin-nav__counter--active"
+                style={{ marginLeft: 6 }}
+              >
+                {pendingApprovalsCount}
+              </span>
+            )}
           </button>
         )}
         {seesAccounts && (
           <button
             type="button"
             className="step"
-            aria-current={step === 'accounts'}
             onClick={() => setStep('accounts')}
           >
             Accounts
@@ -424,7 +617,6 @@ export default function App() {
           <button
             type="button"
             className="step"
-            aria-current={step === 'admin'}
             onClick={() => setStep('admin')}
           >
             Admin
@@ -457,7 +649,7 @@ export default function App() {
           </div>
         )}
 
-        {locked && step !== 'approvals' && step !== 'admin' && step !== 'accounts' && (
+        {locked && (
           <div className="no-print">
             <Notice tone="warning" title="This invoice is locked. ">
               It has been submitted, so it cannot be edited. Use <strong>New invoice</strong> to
@@ -510,39 +702,6 @@ export default function App() {
             onDelete={(id) => void removeFromHistory(id)}
           />
         )}
-
-        {step === 'approvals' && canReview && (
-          <ReviewQueueScreen
-            invoices={queue}
-            role={role}
-            currentUserId={user?.id ?? ''}
-            busy={teamBusy}
-            onDecide={decide}
-            onRefresh={() => void refreshQueue()}
-          />
-        )}
-
-        {step === 'accounts' && seesAccounts && (
-          <AccountsScreen
-            invoices={queue}
-            members={members}
-            busy={teamBusy}
-            onRefresh={() => {
-              void refreshQueue();
-              void refreshMembers();
-            }}
-          />
-        )}
-
-        {step === 'admin' && isAdmin && (
-          <AdminScreen
-            members={members}
-            busy={teamBusy}
-            onPublishRateCard={publishRateCard}
-            onSetRole={setMemberRole}
-            onRefresh={() => void refreshMembers()}
-          />
-        )}
       </main>
     </div>
   );
@@ -554,16 +713,50 @@ function Topbar({
   onNew,
   user,
   onSignOut,
+  isStaff,
+  pendingCount = 0,
+  onOpenAdmin,
 }: {
   onNew?: () => void;
   user?: CurrentUser | null;
   onSignOut?: () => void;
+  isStaff?: boolean;
+  pendingCount?: number;
+  onOpenAdmin?: () => void;
 }) {
   return (
     <header className="topbar no-print">
       <img className="topbar__logo" src="logo-dark.png" alt={COMPANY.name} />
       <span className="topbar__title">Freelancer Invoicing</span>
       <div className="topbar__spacer" />
+
+      {isStaff && onOpenAdmin && (
+        <button
+          type="button"
+          className="topbar__staff-badge"
+          onClick={onOpenAdmin}
+          title="Open Management & Admin Portal"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            style={{ width: 14, height: 14 }}
+          >
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+          </svg>
+          <span>Admin Portal</span>
+          {pendingCount > 0 && (
+            <span className="admin-nav__counter admin-nav__counter--active">
+              {pendingCount}
+            </span>
+          )}
+        </button>
+      )}
 
       {user && (
         <span className="whoami">

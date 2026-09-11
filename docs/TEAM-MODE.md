@@ -5,7 +5,7 @@ are set.
 
 | | **Personal** (default) | **Team** |
 | --- | --- | --- |
-| Accounts | None | Email-link sign-in |
+| Accounts | None | Password or email-link sign-in |
 | Storage | This browser only | Shared database |
 | Invoice history | This browser only | Follows you between devices |
 | Approval | By email | In-app queue for the line manager |
@@ -26,11 +26,9 @@ tool, and the Supabase client is never even downloaded.
 
 ## 2. Create the schema
 
-In the Supabase dashboard, open **SQL Editor** and run the contents of
-[`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql).
-
-It creates the tables, the row-level security policies, the invoice-numbering
-function, and the trigger that enforces the approval flow.
+In the Supabase dashboard, open **SQL Editor** and run the contents of:
+1. [`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql) — creates the tables, row-level security policies, invoice-numbering function, and approval flow trigger.
+2. [`supabase/migrations/0002_integrity.sql`](../supabase/migrations/0002_integrity.sql) — adds atomic stored procedures (`save_invoice`, `transition_invoice`, `delete_invoice`, `publish_rate_card`) and enforces server-side integrity.
 
 ## 3. Point the app at it
 
@@ -48,6 +46,9 @@ is what protects the data, not the secrecy of that key. Never put the
 Restart the dev server, or set the same two variables in your host's
 environment (Vercel: Settings → Environment Variables; Netlify: Site
 configuration → Environment variables) and redeploy.
+
+In **Authentication → URL Configuration**, set **Site URL** to the deployed app URL and add the
+same URL to **Redirect URLs**. Confirmation and passwordless links return there after sign-in.
 
 ## 4. Make yourself an admin
 

@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { lineAmount, sortLines, subtotal, parseIsoDate } from '../domain/invoice';
-import { FIRST_ITEM_ROW, LAST_ITEM_ROW, RATE_CARD, rateItem } from '../domain/rate-card';
+import { FIRST_ITEM_ROW, LAST_ITEM_ROW, activeRateCard, rateItem } from '../domain/rate-card';
 import type { Invoice, InvoiceLine } from '../domain/types';
 import {
   cellStyleId,
@@ -122,7 +122,7 @@ export async function buildXlsx(templateBytes: ArrayBuffer, invoice: Invoice): P
     linesByRow.set(item.row, line);
   }
 
-  for (const item of RATE_CARD) {
+  for (const item of activeRateCard()) {
     if (item.row < FIRST_ITEM_ROW || item.row > LAST_ITEM_ROW) {
       throw new Error(`Rate card row ${item.row} (${item.id}) is outside the template's item rows.`);
     }
