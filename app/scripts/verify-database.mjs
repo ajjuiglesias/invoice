@@ -24,6 +24,11 @@ for (const name of ['0001_init.sql', '0002_integrity.sql', '0003_access_control.
   await db.exec(sql);
 }
 
+// The dashboard may retry a migration after an interrupted run. It must be safe to repeat.
+const accessMigration = (await readFile(resolve(here, '..', '..', 'supabase', 'migrations', '0003_access_control.sql'), 'utf8'))
+  .replace('create extension if not exists "pgcrypto";', '');
+await db.exec(accessMigration);
+
 const freelancer = '00000000-0000-4000-8000-000000000001';
 const manager = '00000000-0000-4000-8000-000000000002';
 const admin = '00000000-0000-4000-8000-000000000003';

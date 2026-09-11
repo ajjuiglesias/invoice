@@ -12,6 +12,7 @@ create table if not exists user_invites (
 );
 create unique index if not exists user_invites_email_key on user_invites(email);
 alter table user_invites enable row level security;
+drop policy if exists user_invites_admin_read on user_invites;
 create policy user_invites_admin_read on user_invites for select to authenticated using (is_admin());
 
 create table if not exists access_audit (
@@ -26,6 +27,7 @@ create table if not exists access_audit (
 );
 create index if not exists access_audit_created_idx on access_audit(created_at desc);
 alter table access_audit enable row level security;
+drop policy if exists access_audit_admin_read on access_audit;
 create policy access_audit_admin_read on access_audit for select to authenticated using (is_admin());
 
 -- Users may edit contact fields only. Role and active state are changed through audited RPCs.
