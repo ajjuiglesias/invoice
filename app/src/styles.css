@@ -1129,6 +1129,8 @@ select:disabled {
 .admin-access-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; border-bottom: 1px solid var(--line); }
 .admin-status-control { border: 0; cursor: pointer; font: inherit; }
 .admin-status-control:disabled { cursor: not-allowed; opacity: .6; }
+.admin-rate-versions { margin-bottom: 20px; }
+.admin-version-create { display: grid; grid-template-columns: minmax(140px, 180px) auto; gap: 10px; align-items: center; }
 
 @media (max-width: 900px) {
   .admin-invite-panel { grid-template-columns: 1fr; align-items: stretch; }
@@ -1136,6 +1138,8 @@ select:disabled {
 
 @media (max-width: 620px) {
   .admin-invite-form { grid-template-columns: 1fr; }
+  .admin-version-create { width: 100%; grid-template-columns: 1fr; }
+  .admin-rate-versions .admin-access-heading { align-items: stretch; flex-direction: column; }
 }
 .auth-privacy { margin: 28px 0 0; padding-top: 20px; border-top: 1px solid var(--line); color: var(--ink-faint); font-size: 12px; line-height: 1.55; text-align: center; }
 

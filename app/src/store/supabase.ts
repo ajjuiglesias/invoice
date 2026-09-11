@@ -2,7 +2,7 @@ import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import { rateItem, type Group, type Indent, type RateItem } from '../domain/rate-card';
 import type { InvoiceStatus, Role } from '../domain/status';
 import { EMPTY_BANK, type BankDetails, type FreelancerProfile, type Invoice, type InvoiceLine } from '../domain/types';
-import type { AccessAuditEntry, CurrentUser, Draft, StorageAdapter, TeamAdapter, TeamMember, UserInvite } from './adapter';
+import type { AccessAuditEntry, CurrentUser, Draft, RateCardSummary, StorageAdapter, TeamAdapter, TeamMember, UserInvite } from './adapter';
 import { requireSupabase } from './supabase-client';
 
 /**
@@ -503,6 +503,26 @@ export class SupabaseAdapter implements StorageAdapter, TeamAdapter {
       items,
     });
     fail('Could not publish the rate card', error);
+  }
+
+  async listRateCards(): Promise<RateCardSummary[]> {
+    const { data, error } = await this.db
+      .from('rate_cards')
+      .select('id,version,published_at,rate_items(count)')
+      .not('published_at', 'is', null)
+      .order('published_at', { ascending: false });
+    fail('Could not load rate cards', error);
+    return (data ?? []).map((row) => ({
+      id: row.id as string,
+      version: row.version as string,
+      publishedAt: row.published_at as string,
+      itemCount: Number((row.rate_items as { count: number }[] | null)?.[0]?.count ?? 0),
+    }));
+  }
+
+  async deleteRateCard(id: string): Promise<void> {
+    const { error } = await this.db.rpc('delete_rate_card', { card_id: id });
+    fail('Could not delete the rate card', error);
   }
 }
 

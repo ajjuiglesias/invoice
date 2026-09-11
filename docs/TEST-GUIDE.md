@@ -181,8 +181,10 @@ Expected:
 8. Confirm access history records the acting administrator, target user, action, time, and role.
 9. Open **Rate Card & Prices**, search and filter task types.
 10. Change one price, discard it, change it again, and publish a new unique version.
-11. Start a new freelancer invoice after publishing.
-12. Re-open an invoice created before the rate change.
+11. Add another version without changing a price.
+12. Delete an unused older version, then attempt to delete the active version.
+13. Start a new freelancer invoice after publishing.
+14. Re-open an invoice created before the rate change.
 
 Expected:
 
@@ -193,6 +195,7 @@ Expected:
 - Publishing requires all valid rates and a unique version.
 - New invoices use the new rate.
 - Existing invoices preserve their original line prices and rate-card version.
+- An unused historical rate card can be deleted; active and invoice-linked cards cannot.
 
 ## 10. Failure and security checks
 

@@ -11,7 +11,7 @@ import {
 import { isEditable, needsDecision, type InvoiceStatus, type Role } from './domain/status';
 import { EMPTY_PROFILE, type FreelancerProfile, type Invoice, type InvoiceLine } from './domain/types';
 import { validateLine, validateProfile } from './domain/validation';
-import type { AccessAuditEntry, CurrentUser, StorageAdapter, TeamAdapter, TeamMember, UserInvite } from './store/adapter';
+import type { AccessAuditEntry, CurrentUser, RateCardSummary, StorageAdapter, TeamAdapter, TeamMember, UserInvite } from './store/adapter';
 import { LocalStorageAdapter, storageAvailable } from './store/local';
 import { migrateLocalData } from './store/migrate';
 import { AccountsScreen } from './ui/AccountsScreen';
@@ -70,6 +70,7 @@ export default function App() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invites, setInvites] = useState<UserInvite[]>([]);
   const [accessAudit, setAccessAudit] = useState<AccessAuditEntry[]>([]);
+  const [rateCards, setRateCards] = useState<RateCardSummary[]>([]);
   const [teamBusy, setTeamBusy] = useState(false);
 
   const [profile, setProfile] = useState<FreelancerProfile>(EMPTY_PROFILE);
@@ -256,12 +257,13 @@ export default function App() {
     if (!cloud) return;
     setTeamBusy(true);
     try {
-      const [nextMembers, nextInvites, nextAudit] = await Promise.all([
-        cloud.listMembers(), cloud.listInvites(), cloud.listAccessAudit(),
+      const [nextMembers, nextInvites, nextAudit, nextRateCards] = await Promise.all([
+        cloud.listMembers(), cloud.listInvites(), cloud.listAccessAudit(), cloud.listRateCards(),
       ]);
       setMembers(nextMembers);
       setInvites(nextInvites);
       setAccessAudit(nextAudit);
+      setRateCards(nextRateCards);
     } catch (error) {
       setBanner(error instanceof Error ? error.message : 'Could not load the team.');
     } finally {
@@ -317,6 +319,18 @@ export default function App() {
     try {
       await cloud.publishRateCard(version, items);
       setActiveRateCard(items, version);
+      setRateCards(await cloud.listRateCards());
+    } finally {
+      setTeamBusy(false);
+    }
+  }, []);
+
+  const deleteRateCard = useCallback(async (id: string) => {
+    if (!cloud) return;
+    setTeamBusy(true);
+    try {
+      await cloud.deleteRateCard(id);
+      setRateCards(await cloud.listRateCards());
     } finally {
       setTeamBusy(false);
     }
@@ -600,8 +614,10 @@ export default function App() {
             members={members}
             invites={invites}
             accessAudit={accessAudit}
+            rateCards={rateCards}
             busy={teamBusy}
             onPublishRateCard={publishRateCard}
+            onDeleteRateCard={deleteRateCard}
             onSetRole={setMemberRole}
             onSetActive={setMemberActive}
             onInviteUser={inviteUser}

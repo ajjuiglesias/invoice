@@ -2,15 +2,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { formatGBP } from '../domain/invoice';
 import { activeRateCard, activeRateCardVersion, GROUPS, type RateItem } from '../domain/rate-card';
 import type { Role } from '../domain/status';
-import type { AccessAuditEntry, TeamMember, UserInvite } from '../store/adapter';
+import type { AccessAuditEntry, RateCardSummary, TeamMember, UserInvite } from '../store/adapter';
 import { Notice } from './components';
 
 interface Props {
   members: TeamMember[];
   invites: UserInvite[];
   accessAudit: AccessAuditEntry[];
+  rateCards: RateCardSummary[];
   busy: boolean;
   onPublishRateCard: (version: string, items: RateItem[]) => Promise<void>;
+  onDeleteRateCard: (id: string) => Promise<void>;
   onSetRole: (memberId: string, role: Role, confirmAdmin?: boolean) => Promise<void>;
   onSetActive: (memberId: string, active: boolean) => Promise<void>;
   onInviteUser: (email: string, role: Role, confirmAdmin?: boolean) => Promise<void>;
@@ -26,8 +28,10 @@ export function AdminScreen({
   members,
   invites,
   accessAudit,
+  rateCards,
   busy,
   onPublishRateCard,
+  onDeleteRateCard,
   onSetRole,
   onSetActive,
   onInviteUser,
@@ -45,7 +49,7 @@ export function AdminScreen({
   }, [initialTab]);
 
   // Rate card state
-  const current = useMemo(() => activeRateCard(), []);
+  const [current, setCurrent] = useState<RateItem[]>(() => activeRateCard());
   const [prices, setPrices] = useState<Record<string, number>>(() =>
     Object.fromEntries(current.map((i) => [i.id, i.price])),
   );
@@ -67,19 +71,32 @@ export function AdminScreen({
   const publish = async () => {
     setStatus(null);
     try {
-      await onPublishRateCard(
-        version.trim(),
-        current.map((item) => ({ ...item, price: prices[item.id] })),
-      );
+      const publishedItems = current.map((item) => ({ ...item, price: prices[item.id] }));
+      const publishedVersion = version.trim();
+      await onPublishRateCard(publishedVersion, publishedItems);
+      setCurrent(publishedItems);
+      setPrices(Object.fromEntries(publishedItems.map((item) => [item.id, item.price])));
+      setVersion(suggestVersion(publishedVersion));
       setStatus({
         tone: 'info',
-        text: `Published version ${version.trim()} successfully! New invoices will use these rates.`,
+        text: `Published version ${publishedVersion} successfully. New invoices will use these rates.`,
       });
     } catch (error) {
       setStatus({
         tone: 'error',
         text: error instanceof Error ? error.message : 'Could not publish the rate card.',
       });
+    }
+  };
+
+  const removeRateCard = async (card: RateCardSummary) => {
+    if (!window.confirm(`Delete rate card ${card.version}? This is only allowed when no invoice uses it.`)) return;
+    setStatus(null);
+    try {
+      await onDeleteRateCard(card.id);
+      setStatus({ tone: 'info', text: `Deleted rate card ${card.version}.` });
+    } catch (error) {
+      setStatus({ tone: 'error', text: error instanceof Error ? error.message : 'Could not delete the rate card.' });
     }
   };
 
@@ -227,6 +244,21 @@ export function AdminScreen({
                 {changed.length === 0 ? 'All prices published' : 'Changes ready to deploy'}
               </span>
             </div>
+          </div>
+
+          <div className="admin-panel-card admin-rate-versions">
+            <div className="admin-access-heading">
+              <div><h3>Rate card versions</h3><p>Create a version from the prices below or remove an unused older version.</p></div>
+              <div className="admin-version-create">
+                <input type="text" value={version} aria-label="New rate card version" placeholder="e.g. 2026-10" onChange={(e) => setVersion(e.target.value)} />
+                <button type="button" className="admin-btn admin-btn--primary" disabled={busy || invalid || !version.trim()} onClick={() => void publish()}>{busy ? 'Publishing…' : 'Add rate card'}</button>
+              </div>
+            </div>
+            {rateCards.length === 0 ? <p className="empty" style={{ padding: 24 }}>No published rate cards yet. Add the first version above.</p> : (
+              <div className="admin-table-container"><table className="admin-table"><thead><tr><th>Version</th><th>Published</th><th>Tasks</th><th>Status</th><th></th></tr></thead><tbody>
+                {rateCards.map((card, index) => <tr key={card.id}><td><strong>{card.version}</strong></td><td className="admin-table-faint">{new Date(card.publishedAt).toLocaleString('en-GB')}</td><td>{card.itemCount}</td><td>{index === 0 ? <span className="admin-status-badge admin-status-badge--active">Active</span> : <span className="admin-table-faint">Previous</span>}</td><td><button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" disabled={busy || index === 0} title={index === 0 ? 'Publish another version before deleting the active card' : 'Delete this unused rate card'} onClick={() => void removeRateCard(card)}>Delete</button></td></tr>)}
+              </tbody></table></div>
+            )}
           </div>
 
           {/* Rate Card Filter Bar */}

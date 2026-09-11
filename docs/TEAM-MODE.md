@@ -30,6 +30,7 @@ In the Supabase dashboard, open **SQL Editor** and run the contents of:
 1. [`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql) — creates the tables, row-level security policies, invoice-numbering function, and approval flow trigger.
 2. [`supabase/migrations/0002_integrity.sql`](../supabase/migrations/0002_integrity.sql) — adds atomic stored procedures (`save_invoice`, `transition_invoice`, `delete_invoice`, `publish_rate_card`) and enforces server-side integrity.
 3. [`supabase/migrations/0003_access_control.sql`](../supabase/migrations/0003_access_control.sql) — enables invitation-only registration, audited role and access controls, and last-admin protection.
+4. [`supabase/migrations/0004_rate_card_management.sql`](../supabase/migrations/0004_rate_card_management.sql) — adds safe deletion of unused historical rate-card versions.
 
 ## 3. Point the app at it
 
@@ -130,6 +131,10 @@ would break the generated spreadsheet, so the code refuses.
 
 If no rate card has been published, the app uses the one compiled into
 `app/src/domain/rate-card.ts`.
+
+Admins can create a new version without changing prices and delete an obsolete version. The active
+version, the last published version, and any version referenced by an invoice are protected from
+deletion.
 
 ## Migrating existing users
 

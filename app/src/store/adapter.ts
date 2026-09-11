@@ -63,6 +63,13 @@ export interface AccessAuditEntry {
   createdAt: string;
 }
 
+export interface RateCardSummary {
+  id: string;
+  version: string;
+  publishedAt: string;
+  itemCount: number;
+}
+
 export interface CurrentUser {
   id: string;
   email: string;
@@ -104,5 +111,7 @@ export interface TeamAdapter {
 
   /** The published rate card, or null if none has been published yet. */
   loadPublishedRateCard(): Promise<{ version: string; items: RateItem[] } | null>;
+  listRateCards(): Promise<RateCardSummary[]>;
   publishRateCard(version: string, items: RateItem[]): Promise<void>;
+  deleteRateCard(id: string): Promise<void>;
 }

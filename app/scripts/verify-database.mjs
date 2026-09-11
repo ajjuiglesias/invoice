@@ -16,7 +16,7 @@ await db.exec(`
   $$;
 `);
 
-for (const name of ['0001_init.sql', '0002_integrity.sql', '0003_access_control.sql']) {
+for (const name of ['0001_init.sql', '0002_integrity.sql', '0003_access_control.sql', '0004_rate_card_management.sql']) {
   const sql = (await readFile(resolve(here, '..', '..', 'supabase', 'migrations', name), 'utf8'))
     // Supabase ships pgcrypto. PGlite does not bundle its control file, while
     // modern Postgres still provides the gen_random_uuid() function we use.
@@ -81,6 +81,16 @@ let protectedLastAdmin = false;
 try { await db.query(`select set_member_role('${admin}','freelancer',false)`); }
 catch (error) { protectedLastAdmin = /last active admin/i.test(String(error)); }
 if (!protectedLastAdmin) throw new Error('Last administrator was not protected.');
+
+const oldCard = '00000000-0000-4000-8000-000000000201';
+const activeCard = '00000000-0000-4000-8000-000000000202';
+await db.exec(`insert into rate_cards(id,version,published_at,published_by) values
+  ('${oldCard}','test-old','2026-01-01','${admin}'),('${activeCard}','test-active','2026-02-01','${admin}')`);
+await db.query(`select delete_rate_card('${oldCard}')`);
+let protectedActiveCard = false;
+try { await db.query(`select delete_rate_card('${activeCard}')`); }
+catch (error) { protectedActiveCard = /active rate card/i.test(String(error)); }
+if (!protectedActiveCard) throw new Error('Active rate card was not protected.');
 
 console.log('Database migrations and secured invoice lifecycle: OK');
 await db.close();
