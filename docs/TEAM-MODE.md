@@ -8,7 +8,7 @@ are set.
 | Accounts | None | Password or email-link sign-in |
 | Storage | This browser only | Shared database |
 | Invoice history | This browser only | Follows you between devices |
-| Approval | By email | In-app queue for the line manager |
+| Approval | Local record | In-app queue for the line manager |
 | Rate card | Compiled into the app | Admin-editable, versioned |
 | Bank details | This browser only | **Still this browser only** |
 
@@ -72,7 +72,7 @@ then ask them to use **New user** on the sign-in page. Registrations without a p
 are rejected. The portal records invitations, role changes, activations, and deactivations in the
 access history.
 
-## 5. Set up email delivery
+## 5. Set up authentication email delivery
 
 Supabase's built-in email sender is rate-limited and only really suitable for
 testing. For real use, add an SMTP provider under
@@ -159,9 +159,3 @@ Visible to `accounts` and `admin`. It answers the month-end questions:
 
 The figures only ever cover invoices the signed-in person is allowed to see,
 because they come through the same row-level security as everything else.
-
-## What is not built yet
-
-- **Automatic sending to accounts on approval** (B4 in the plan). Approved
-  invoices still go by the existing Gmail hand-off. This needs a verified
-  sending domain — see the DNS question in §1 of PLAN-PHASE-B.md.

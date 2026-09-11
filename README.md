@@ -24,10 +24,8 @@ Bank details stay on the freelancer's own machine in **both** modes.
    paste in the Asana task link and the live page URL for each piece of work.
    The app checks as you go: it flags missing links, preview/draft URLs, and the
    same Asana task being invoiced twice.
-4. **Review & send** — download the two files, then click **Open in Gmail**. The
-   email is pre-addressed to `accounts@juliacharles.co.uk` with
-   `stacy@juliacharles.co.uk` copied in, subject and body written. Attach the
-   two files and send.
+4. **Review & submit** — download a copy if needed, then submit the invoice into
+   the in-app approval workflow for the line manager.
 
 Next month, open **Past invoices** and hit **Copy to ‹month›**. You get the same
 task types and quantities with a fresh invoice number and empty link fields —
@@ -157,7 +155,6 @@ app/src/
               pdf.tsx (the branded PDF)
   store/      StorageAdapter + TeamAdapter interfaces,
               LocalStorageAdapter and SupabaseAdapter
-  mail/       MailAdapter interface + Gmail / mailto adapters
   ui/         screens and components
 app/scripts/  template scrubber and the two verification harnesses
 supabase/     schema, row level security and triggers

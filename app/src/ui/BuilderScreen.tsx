@@ -81,7 +81,7 @@ export function BuilderScreen({
             month: 'long',
             year: 'numeric',
           })}{' '}
-          — 5 working days before month end. Send it anyway, but flag it to your line manager.
+          — 5 working days before month end. You can still submit it, but flag it to your line manager.
         </Notice>
       )}
       {deadline.status === 'due-soon' && (

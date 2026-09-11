@@ -16,6 +16,7 @@ import { LocalStorageAdapter, storageAvailable } from './store/local';
 import { migrateLocalData } from './store/migrate';
 import { AccountsScreen } from './ui/AccountsScreen';
 import { AdminLayout, type AdminSection } from './ui/AdminLayout';
+import { AdminDashboardScreen } from './ui/AdminDashboardScreen';
 import { AdminScreen } from './ui/AdminScreen';
 import { AuthScreen, PasswordSetupScreen } from './ui/AuthScreen';
 import { BuilderScreen } from './ui/BuilderScreen';
@@ -25,7 +26,7 @@ import { HistoryScreen } from './ui/HistoryScreen';
 import { ReviewQueueScreen } from './ui/ReviewQueueScreen';
 import { ReviewScreen } from './ui/ReviewScreen';
 
-type Step = 'details' | 'build' | 'review' | 'history' | 'approvals' | 'accounts' | 'admin' | 'admin-history';
+type Step = 'details' | 'build' | 'review' | 'history' | 'dashboard' | 'approvals' | 'accounts' | 'admin' | 'admin-history';
 
 /**
  * One backend or the other, chosen once at start-up.
@@ -168,7 +169,9 @@ export default function App() {
         setInvoiceNumber(next);
       }
 
-      if (user?.role === 'admin' || user?.role === 'manager') {
+      if (user?.role === 'admin') {
+        setStep('dashboard');
+      } else if (user?.role === 'manager') {
         setStep('approvals');
       } else if (user?.role === 'accounts') {
         setStep('accounts');
@@ -272,6 +275,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (step === 'dashboard') {
+      void refreshQueue();
+      void refreshMembers();
+    }
     if (step === 'approvals') void refreshQueue();
     if (step === 'admin') void refreshMembers();
     if (step === 'accounts') {
@@ -438,7 +445,9 @@ export default function App() {
 
   const handleAdminNavigate = useCallback(
     (section: AdminSection) => {
-      if (section === 'approvals') {
+      if (section === 'dashboard') {
+        setStep('dashboard');
+      } else if (section === 'approvals') {
         setStep('approvals');
       } else if (section === 'accounts') {
         setStep('accounts');
@@ -458,7 +467,10 @@ export default function App() {
   );
 
   const handleAdminRefresh = useCallback(() => {
-    if (step === 'approvals') void refreshQueue();
+    if (step === 'dashboard') {
+      void refreshQueue();
+      void refreshMembers();
+    } else if (step === 'approvals') void refreshQueue();
     else if (step === 'accounts') {
       void refreshQueue();
       void refreshMembers();
@@ -544,11 +556,13 @@ export default function App() {
   }
 
   const inAdminShell =
-    step === 'approvals' || step === 'accounts' || step === 'admin' || step === 'admin-history';
+    step === 'dashboard' || step === 'approvals' || step === 'accounts' || step === 'admin' || step === 'admin-history';
 
   if (inAdminShell) {
     const currentAdminSection: AdminSection =
-      step === 'approvals'
+      step === 'dashboard'
+        ? 'dashboard'
+        : step === 'approvals'
         ? 'approvals'
         : step === 'accounts'
         ? 'accounts'
@@ -584,6 +598,10 @@ export default function App() {
               </button>
             </Notice>
           </div>
+        )}
+
+        {step === 'dashboard' && isAdmin && (
+          <AdminDashboardScreen invoices={queue} members={members} invites={invites} accessAudit={accessAudit} rateCards={rateCards} onNavigate={handleAdminNavigate} />
         )}
 
         {step === 'approvals' && canReview && (
@@ -630,7 +648,7 @@ export default function App() {
 
         {step === 'admin-history' && (
           <HistoryScreen
-            invoices={history}
+            invoices={queue}
             onEdit={editInvoice}
             onCopyToNewMonth={(inv) => void copyToNewMonth(inv)}
             onDelete={(id) => void removeFromHistory(id)}
@@ -671,7 +689,7 @@ export default function App() {
         />
         <StepButton
           n={3}
-          label="Review & send"
+          label="Review & submit"
           active={step === 'review'}
           done={false}
           disabled={!detailsComplete || !linesComplete}

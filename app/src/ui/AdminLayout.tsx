@@ -3,7 +3,7 @@ import { COMPANY } from '../domain/company';
 import type { Role } from '../domain/status';
 import type { CurrentUser } from '../store/adapter';
 
-export type AdminSection = 'approvals' | 'accounts' | 'admin-rates' | 'admin-team' | 'history' | 'build';
+export type AdminSection = 'dashboard' | 'approvals' | 'accounts' | 'admin-rates' | 'admin-team' | 'history' | 'build';
 
 interface AdminLayoutProps {
   currentSection: AdminSection;
@@ -47,6 +47,8 @@ export function AdminLayout({
 
   const getSectionTitle = () => {
     switch (currentSection) {
+      case 'dashboard':
+        return 'Dashboard';
       case 'approvals':
         return 'Invoice Approvals';
       case 'accounts':
@@ -103,6 +105,13 @@ export function AdminLayout({
         <nav className="admin-nav">
           <div className="admin-nav__group">
             <span className="admin-nav__heading">MANAGEMENT</span>
+
+            {isAdmin && (
+              <button type="button" className={`admin-nav__item ${currentSection === 'dashboard' ? 'admin-nav__item--active' : ''}`} onClick={() => { onNavigate('dashboard'); setMobileMenuOpen(false); }}>
+                <svg className="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                <span className="admin-nav__label">Dashboard</span>
+              </button>
+            )}
 
             {canReview && (
               <button

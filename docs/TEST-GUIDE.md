@@ -105,22 +105,19 @@ Expected:
 - Branding, fonts, spacing, names, addresses, dates, invoice number, and bank details are correct.
 - No old invoice data remains in unused template cells.
 
-## 5. Deadline and email behaviour
+## 5. Deadline and submission behaviour
 
 1. Create an invoice for a month whose submission window has passed.
 2. Continue to review.
 3. Confirm the late warning is displayed.
-4. Download both files and select **Open in Gmail**.
-5. Also inspect **Preview the email** and **Copy the email**.
+4. Download both files and select **Submit for approval**.
 
 Expected:
 
-- A late invoice remains downloadable, submittable, and sendable.
-- The warning says to flag the late submission to the line manager.
-- Gmail opens a draft addressed to `accounts@juliacharles.co.uk`.
-- `stacy@juliacharles.co.uk` is in CC.
-- Subject, body, invoice month, freelancer name, total, and attachment instructions are correct.
-- The app never sends automatically; the user reviews, attaches both files, and sends from Gmail.
+- A late invoice remains downloadable and submittable.
+- The warning clearly identifies the missed submission window.
+- The invoice appears immediately in the manager's approval queue.
+- No Gmail, mail-client, recipient, CC, or email-preview controls are displayed.
 
 ## 6. Submit and lock
 
@@ -220,8 +217,7 @@ Expected:
 - [ ] Freelancer profile and user-specific bank storage pass.
 - [ ] Draft autosave and restore pass.
 - [ ] Excel and PDF match the reviewed invoice.
-- [ ] Late invoice can still be downloaded, submitted, and emailed.
-- [ ] Email recipient and CC are correct.
+- [ ] Late invoice can still be downloaded and submitted.
 - [ ] Freelancer isolation and invoice locking pass.
 - [ ] Manager change request and approval pass.
 - [ ] Accounts totals, CSV, sent, and paid flow pass.

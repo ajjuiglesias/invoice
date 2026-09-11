@@ -14,15 +14,6 @@ export const COMPANY = {
   website: 'juliacharleseventmanagement.co.uk',
 } as const;
 
-export const RECIPIENTS = {
-  /** Accounts receive the invoice directly. */
-  to: 'accounts@juliacharles.co.uk',
-  /** Copied in for approval and visibility. */
-  cc: 'stacy@juliacharles.co.uk',
-  /** Opening line of the covering email. */
-  greeting: 'Hi,',
-} as const;
-
 /** Brand palette, straight from the brand guidelines deck. */
 export const BRAND = {
   teal: '#0FABAC',
@@ -39,7 +30,7 @@ export const INVOICING_RULES = [
   'Attach an Asana link and a webpage link to each page on the website you complete.',
   'You can only invoice for pages that have been signed off by your line manager and published.',
   'All elements of the process must be completed before invoicing.',
-  'Send to your line manager at least 5 working days before the last day of the month.',
+  'Submit for approval at least 5 working days before the last day of the month.',
 ] as const;
 
 /** Working days of notice required before the last day of the month. */

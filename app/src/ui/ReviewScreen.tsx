@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { NOTICE_WORKING_DAYS, RECIPIENTS } from '../domain/company';
+import { NOTICE_WORKING_DAYS } from '../domain/company';
 import { deadlineStatus, formatGBP, invoiceFileBase, monthLabel, subtotal } from '../domain/invoice';
 import type { Invoice } from '../domain/types';
 import { validateInvoice } from '../domain/validation';
 import { downloadBlob, loadTemplate } from '../export/download';
 import { buildXlsx } from '../export/xlsx';
-import { buildMessage, GmailComposeAdapter, MailtoAdapter, messageAsText } from '../mail/gmail';
 import { Card, IssueSummary, Notice } from './components';
 import { InvoicePreview } from './InvoicePreview';
 
@@ -13,7 +12,7 @@ interface Props {
   invoice: Invoice;
   onBack: () => void;
   onRecord: (invoice: Invoice) => void;
-  /** Team mode only: submit to the line manager instead of emailing. */
+  /** Team mode: submit into the approval workflow. */
   onSubmit?: () => void;
   submitting?: boolean;
 }
@@ -24,7 +23,6 @@ export function ReviewScreen({ invoice, onBack, onRecord, onSubmit, submitting }
   const [busy, setBusy] = useState(false);
   const [busyPdf, setBusyPdf] = useState(false);
   const [status, setStatus] = useState<Status>(null);
-  const [downloaded, setDownloaded] = useState(false);
 
   const issues = validateInvoice(invoice);
   const errors = issues.filter((i) => i.severity === 'error');
@@ -50,7 +48,6 @@ export function ReviewScreen({ invoice, onBack, onRecord, onSubmit, submitting }
       }
 
       downloadBlob(blob, xlsxName);
-      setDownloaded(true);
       onRecord(invoice);
       setStatus({ tone: 'info', text: `Saved ${xlsxName}. This is the file accounts needs.` });
     } catch (error) {
@@ -72,7 +69,6 @@ export function ReviewScreen({ invoice, onBack, onRecord, onSubmit, submitting }
       const { buildPdf } = await import('../export/pdf');
       const blob = await buildPdf(invoice);
       downloadBlob(blob, pdfName);
-      setDownloaded(true);
       onRecord(invoice);
       setStatus({ tone: 'info', text: `Saved ${pdfName}.` });
     } catch (error) {
@@ -85,37 +81,11 @@ export function ReviewScreen({ invoice, onBack, onRecord, onSubmit, submitting }
     }
   };
 
-  const message = buildMessage(invoice, [xlsxName, pdfName]);
-
-  const openGmail = () => {
-    new GmailComposeAdapter().deliver(message);
-    setStatus({
-      tone: 'info',
-      text: 'Gmail is open with the email filled in. Attach the two downloaded files, then send.',
-    });
-  };
-
-  const openMailClient = () => {
-    new MailtoAdapter().deliver(message);
-  };
-
-  const copyEmail = async () => {
-    try {
-      await navigator.clipboard.writeText(messageAsText(message));
-      setStatus({ tone: 'info', text: 'Email copied to your clipboard.' });
-    } catch {
-      setStatus({ tone: 'error', text: 'Could not copy — select the text below and copy manually.' });
-    }
-  };
-
   return (
     <>
       <div className="screen-head no-print">
-        <h1>Review &amp; send</h1>
-        <p>
-          Check the invoice below, download both files, then send them to {RECIPIENTS.to} with{' '}
-          {RECIPIENTS.cc} copied in.
-        </p>
+        <h1>Review &amp; submit</h1>
+        <p>Check the invoice below, download a copy if needed, then submit it into the approval workflow.</p>
       </div>
 
       <div className="no-print">
@@ -168,8 +138,7 @@ export function ReviewScreen({ invoice, onBack, onRecord, onSubmit, submitting }
 
           {deadline.status === 'late' && !blocked && (
             <Notice tone="warning" title="This is past the submission window. ">
-              {deadlineExplanation(deadline)} You can still download and send it — just flag it to
-              your line manager.
+              {deadlineExplanation(deadline)} You can still submit it; your manager will see that it is late.
             </Notice>
           )}
 
@@ -194,15 +163,15 @@ export function ReviewScreen({ invoice, onBack, onRecord, onSubmit, submitting }
             </button>
           </div>
           <p className="small muted" style={{ margin: '12px 0 0' }}>
-            Send both: accounts work from the spreadsheet, and the PDF is the readable copy. The
-            Asana and page links stay clickable in both.
+            The spreadsheet follows the company template and the PDF is a readable copy. Asana and
+            page links stay clickable in both.
           </p>
         </Card>
 
         {onSubmit && (
           <Card
             title="2. Submit for approval"
-            subtitle="Your line manager reviews it here — no email needed"
+            subtitle="Your line manager reviews it inside this portal"
           >
             <div className="actions">
               <button
@@ -221,60 +190,6 @@ export function ReviewScreen({ invoice, onBack, onRecord, onSubmit, submitting }
             </p>
           </Card>
         )}
-
-        <Card
-          title={onSubmit ? 'Or send it by email' : '2. Send it'}
-          subtitle={`To ${RECIPIENTS.to}, copying ${RECIPIENTS.cc}`}
-        >
-          {!downloaded && (
-            <Notice tone="warning">
-              Download the files first — the email opens ready to send, but you still attach the
-              files yourself.
-            </Notice>
-          )}
-
-          <div className="actions">
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={openGmail}
-              disabled={blocked}
-            >
-              Open in Gmail
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={openMailClient}
-              disabled={blocked}
-            >
-              Open in my mail app
-            </button>
-            <button type="button" className="btn btn--ghost" onClick={copyEmail}>
-              Copy the email
-            </button>
-          </div>
-
-          <details style={{ marginTop: 16 }}>
-            <summary className="small muted" style={{ cursor: 'pointer' }}>
-              Preview the email
-            </summary>
-            <pre
-              className="small"
-              style={{
-                whiteSpace: 'pre-wrap',
-                background: '#fafbfb',
-                border: '1px solid var(--line)',
-                borderRadius: 'var(--radius-sm)',
-                padding: 14,
-                marginTop: 10,
-                fontFamily: 'inherit',
-              }}
-            >
-              {messageAsText(message)}
-            </pre>
-          </details>
-        </Card>
 
         <div className="actions actions--split">
           <button type="button" className="btn btn--ghost" onClick={onBack}>
