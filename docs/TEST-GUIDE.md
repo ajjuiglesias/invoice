@@ -44,12 +44,30 @@ Expected:
 2. Enter an incorrect password and confirm a clear error appears.
 3. Enter the correct password.
 4. Sign out, select **Sign in with an email link**, and request a link.
+5. Sign out, select **Forgot or need to create a password?**, and request a setup link.
+6. Open the setup link, verify mismatched passwords are rejected, and save a matching password of
+   at least eight characters.
+7. Sign out and sign in with the new password.
 
 Expected:
 
 - Correct credentials restore the same profile, draft, and invoice history.
 - The passwordless link returns to the app and signs in the same user.
+- An email-link-only user can create a password without creating a second account.
+- The recovery link opens the branded password setup screen and the new password works afterwards.
 - Signing out prevents access to authenticated pages.
+
+### Google sign-in (when enabled in Supabase)
+
+1. Select **Continue with Google**.
+2. Choose the Google account whose email should own the portal account.
+3. Return to the app, sign out, and repeat the Google sign-in.
+
+Expected:
+
+- The first sign-in creates one freelancer profile and opens the details screen.
+- Later Google sign-ins return to the same profile and invoice history.
+- Cancelling or denying Google access returns a clear error and does not create a partial session.
 
 ## 2. Freelancer profile and autosave
 

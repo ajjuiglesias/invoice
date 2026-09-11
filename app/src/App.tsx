@@ -17,7 +17,7 @@ import { migrateLocalData } from './store/migrate';
 import { AccountsScreen } from './ui/AccountsScreen';
 import { AdminLayout, type AdminSection } from './ui/AdminLayout';
 import { AdminScreen } from './ui/AdminScreen';
-import { AuthScreen } from './ui/AuthScreen';
+import { AuthScreen, PasswordSetupScreen } from './ui/AuthScreen';
 import { BuilderScreen } from './ui/BuilderScreen';
 import { Notice } from './ui/components';
 import { DetailsScreen } from './ui/DetailsScreen';
@@ -63,6 +63,9 @@ export default function App() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [authChecked, setAuthChecked] = useState(!teamMode);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [passwordRecovery, setPasswordRecovery] = useState(
+    () => new URLSearchParams(window.location.search).get('reset-password') === '1',
+  );
   const [queue, setQueue] = useState<Invoice[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [teamBusy, setTeamBusy] = useState(false);
@@ -419,6 +422,25 @@ export default function App() {
     );
   }
 
+  if (teamMode && passwordRecovery) {
+    return (
+      <div className="app">
+        <PasswordSetupScreen
+          onSave={async (password) => {
+            if (!cloud) throw new Error('The invoicing service is unavailable. Please refresh and try again.');
+            await cloud.updatePassword!(password);
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('reset-password');
+            window.history.replaceState({}, '', `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+            setPasswordRecovery(false);
+            setUser(await cloud.currentUser());
+            setBanner('Your password has been saved.');
+          }}
+        />
+      </div>
+    );
+  }
+
   if (teamMode && !user) {
     return (
       <div className="app">
@@ -442,6 +464,14 @@ export default function App() {
             await cloud.signUpWithPassword!(email, password);
             const current = await cloud.currentUser();
             if (current) setUser(current);
+          }}
+          onResetPassword={async (email) => {
+            if (!cloud) throw new Error('The invoicing service is unavailable. Please refresh and try again.');
+            await cloud.requestPasswordReset!(email);
+          }}
+          onGoogle={async () => {
+            if (!cloud) throw new Error('The invoicing service is unavailable. Please refresh and try again.');
+            await cloud.signInWithGoogle!();
           }}
         />
       </div>

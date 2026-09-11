@@ -6,11 +6,13 @@ interface Props {
   onMagicLink: (email: string) => Promise<void>;
   onSignIn: (email: string, password: string) => Promise<void>;
   onSignUp: (email: string, password: string) => Promise<void>;
+  onResetPassword: (email: string) => Promise<void>;
+  onGoogle: () => Promise<void>;
 }
 
-type Mode = 'signin' | 'signup' | 'magic';
+type Mode = 'signin' | 'signup' | 'magic' | 'reset';
 
-export function AuthScreen({ onMagicLink, onSignIn, onSignUp }: Props) {
+export function AuthScreen({ onMagicLink, onSignIn, onSignUp, onResetPassword, onGoogle }: Props) {
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,11 +24,14 @@ export function AuthScreen({ onMagicLink, onSignIn, onSignUp }: Props) {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busy || !validEmail || (mode !== 'magic' && !validPassword)) return;
+    if (busy || !validEmail || (!['magic', 'reset'].includes(mode) && !validPassword)) return;
     setBusy(true);
     setMessage(null);
     try {
-      if (mode === 'magic') {
+      if (mode === 'reset') {
+        await onResetPassword(email.trim());
+        setMessage({ tone: 'info', text: `Password setup link sent to ${email.trim()}. Open it to create your password.` });
+      } else if (mode === 'magic') {
         await onMagicLink(email.trim());
         setMessage({ tone: 'info', text: `Sign-in link sent to ${email.trim()}. Open it on this device.` });
       } else if (mode === 'signup') {
@@ -48,6 +53,18 @@ export function AuthScreen({ onMagicLink, onSignIn, onSignUp }: Props) {
     setPassword('');
   };
 
+  const googleSignIn = async () => {
+    if (busy) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await onGoogle();
+    } catch (error) {
+      setMessage({ tone: 'error', text: error instanceof Error ? error.message : 'Google sign-in is not available.' });
+      setBusy(false);
+    }
+  };
+
   return (
     <main className="auth-shell">
       <section className="auth-brand" aria-label="About the invoice portal">
@@ -67,10 +84,11 @@ export function AuthScreen({ onMagicLink, onSignIn, onSignUp }: Props) {
       <section className="auth-panel">
         <div className="auth-card">
           <span className="eyebrow">Secure team access</span>
-          <h2>{mode === 'signup' ? 'Create your account' : mode === 'magic' ? 'Email sign-in link' : 'Welcome back'}</h2>
+          <h2>{mode === 'signup' ? 'Create your account' : mode === 'magic' ? 'Email sign-in link' : mode === 'reset' ? 'Create a password' : 'Welcome back'}</h2>
           <p className="auth-card__intro">
             {mode === 'signup' ? 'Use your work email. New accounts start as freelancers.' :
               mode === 'magic' ? 'We will send a one-time link. No password needed.' :
+              mode === 'reset' ? 'We will email a secure link where you can set or replace your password.' :
                 'Sign in to continue your invoice or review team submissions.'}
           </p>
 
@@ -88,7 +106,7 @@ export function AuthScreen({ onMagicLink, onSignIn, onSignUp }: Props) {
                 onChange={(event) => setEmail(event.target.value)} />
             </label>
 
-            {mode !== 'magic' && (
+            {mode !== 'magic' && mode !== 'reset' && (
               <label>
                 <span>Password</span>
                 <div className="password-field">
@@ -103,16 +121,73 @@ export function AuthScreen({ onMagicLink, onSignIn, onSignUp }: Props) {
             )}
 
             <button className="btn btn--primary auth-submit" type="submit"
-              disabled={busy || !validEmail || (mode !== 'magic' && !validPassword)}>
+              disabled={busy || !validEmail || (!['magic', 'reset'].includes(mode) && !validPassword)}>
               {busy ? <><span className="spinner" aria-hidden="true" /> Please wait…</> :
-                mode === 'signup' ? 'Create account' : mode === 'magic' ? 'Send secure link' : 'Sign in'}
+                mode === 'signup' ? 'Create account' : mode === 'magic' ? 'Send secure link' : mode === 'reset' ? 'Send password setup link' : 'Sign in'}
             </button>
           </form>
 
-          <button type="button" className="auth-alternative" onClick={() => changeMode(mode === 'magic' ? 'signin' : 'magic')}>
-            {mode === 'magic' ? 'Use password instead' : 'Sign in with an email link'}
-          </button>
+          {mode === 'signin' && <button type="button" className="auth-forgot" onClick={() => changeMode('reset')}>Forgot or need to create a password?</button>}
+          <div className="auth-options">
+            <button type="button" className="auth-alternative" onClick={() => changeMode(mode === 'magic' || mode === 'reset' ? 'signin' : 'magic')}>
+              {mode === 'magic' || mode === 'reset' ? 'Back to password sign in' : 'Sign in with an email link'}
+            </button>
+            <span>or</span>
+            <button type="button" className="auth-google" onClick={() => void googleSignIn()} disabled={busy}>
+              <b aria-hidden="true">G</b> Continue with Google
+            </button>
+          </div>
           <p className="auth-privacy">Bank details stay on this device and are never stored in the team database.</p>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+interface PasswordSetupProps {
+  onSave: (password: string) => Promise<void>;
+}
+
+export function PasswordSetupScreen({ onSave }: PasswordSetupProps) {
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const valid = password.length >= 8 && password === confirm;
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!valid || busy) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await onSave(password);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not save your password.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <main className="auth-shell">
+      <section className="auth-brand" aria-label="About the invoice portal">
+        <img src="logo-dark.png" alt={COMPANY.name} className="auth-brand__logo" />
+        <div className="auth-brand__copy"><span className="eyebrow eyebrow--light">Secure account</span><h1>Create your password.</h1><p>Use it next time for fast access without opening your email.</p></div>
+      </section>
+      <section className="auth-panel">
+        <div className="auth-card">
+          <span className="eyebrow">Password setup</span>
+          <h2>Choose a new password</h2>
+          <p className="auth-card__intro">Use at least eight characters. A longer, unique password is safer.</p>
+          {message && <Notice tone="error">{message}</Notice>}
+          <form className="auth-form" onSubmit={submit}>
+            <label><span>New password</span><div className="password-field"><input type={show ? 'text' : 'password'} value={password} autoComplete="new-password" placeholder="At least 8 characters" onChange={(e) => setPassword(e.target.value)} /><button type="button" onClick={() => setShow((v) => !v)}>{show ? 'Hide' : 'Show'}</button></div></label>
+            <label><span>Confirm password</span><input type={show ? 'text' : 'password'} value={confirm} autoComplete="new-password" placeholder="Enter it again" aria-invalid={(confirm.length > 0 && confirm !== password) || undefined} onChange={(e) => setConfirm(e.target.value)} /></label>
+            {confirm.length > 0 && confirm !== password && <span className="field-error">Passwords do not match.</span>}
+            <button className="btn btn--primary auth-submit" type="submit" disabled={!valid || busy}>{busy ? 'Saving…' : 'Save password'}</button>
+          </form>
         </div>
       </section>
     </main>

@@ -66,6 +66,9 @@ export interface TeamAdapter {
   signInWithEmail(email: string): Promise<void>;
   signInWithPassword?(email: string, password: string): Promise<void>;
   signUpWithPassword?(email: string, password: string): Promise<void>;
+  requestPasswordReset?(email: string): Promise<void>;
+  updatePassword?(password: string): Promise<void>;
+  signInWithGoogle?(): Promise<void>;
   signOut(): Promise<void>;
   /** Fires whenever the session changes. Returns an unsubscribe function. */
   onAuthChange(listener: () => void): () => void;

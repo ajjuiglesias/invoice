@@ -214,6 +214,40 @@ export class SupabaseAdapter implements StorageAdapter, TeamAdapter {
     }
   }
 
+  async requestPasswordReset(email: string): Promise<void> {
+    try {
+      const redirectTo = new URL(window.location.origin);
+      redirectTo.searchParams.set('reset-password', '1');
+      const { error } = await this.db.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: redirectTo.toString(),
+      });
+      if (error) throw error;
+    } catch (error) {
+      throw new Error(humanise(error));
+    }
+  }
+
+  async updatePassword(password: string): Promise<void> {
+    try {
+      const { error } = await this.db.auth.updateUser({ password });
+      if (error) throw error;
+    } catch (error) {
+      throw new Error(humanise(error));
+    }
+  }
+
+  async signInWithGoogle(): Promise<void> {
+    try {
+      const { error } = await this.db.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      });
+      if (error) throw error;
+    } catch (error) {
+      throw new Error(humanise(error));
+    }
+  }
+
   async signOut(): Promise<void> {
     await this.db.auth.signOut();
     this.userId = null;
