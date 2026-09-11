@@ -57,18 +57,6 @@ Expected:
 - The recovery link opens the branded password setup screen and the new password works afterwards.
 - Signing out prevents access to authenticated pages.
 
-### Google sign-in (when enabled in Supabase)
-
-1. Select **Continue with Google**.
-2. Choose the Google account whose email should own the portal account.
-3. Return to the app, sign out, and repeat the Google sign-in.
-
-Expected:
-
-- The first sign-in creates one freelancer profile and opens the details screen.
-- Later Google sign-ins return to the same profile and invoice history.
-- Cancelling or denying Google access returns a clear error and does not create a partial session.
-
 ## 2. Freelancer profile and autosave
 
 1. Sign in as Freelancer A.

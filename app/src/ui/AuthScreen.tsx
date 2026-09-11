@@ -7,12 +7,11 @@ interface Props {
   onSignIn: (email: string, password: string) => Promise<void>;
   onSignUp: (email: string, password: string) => Promise<void>;
   onResetPassword: (email: string) => Promise<void>;
-  onGoogle: () => Promise<void>;
 }
 
 type Mode = 'signin' | 'signup' | 'magic' | 'reset';
 
-export function AuthScreen({ onMagicLink, onSignIn, onSignUp, onResetPassword, onGoogle }: Props) {
+export function AuthScreen({ onMagicLink, onSignIn, onSignUp, onResetPassword }: Props) {
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,18 +50,6 @@ export function AuthScreen({ onMagicLink, onSignIn, onSignUp, onResetPassword, o
     setMode(next);
     setMessage(null);
     setPassword('');
-  };
-
-  const googleSignIn = async () => {
-    if (busy) return;
-    setBusy(true);
-    setMessage(null);
-    try {
-      await onGoogle();
-    } catch (error) {
-      setMessage({ tone: 'error', text: error instanceof Error ? error.message : 'Google sign-in is not available.' });
-      setBusy(false);
-    }
   };
 
   return (
@@ -128,15 +115,9 @@ export function AuthScreen({ onMagicLink, onSignIn, onSignUp, onResetPassword, o
           </form>
 
           {mode === 'signin' && <button type="button" className="auth-forgot" onClick={() => changeMode('reset')}>Forgot or need to create a password?</button>}
-          <div className="auth-options">
-            <button type="button" className="auth-alternative" onClick={() => changeMode(mode === 'magic' || mode === 'reset' ? 'signin' : 'magic')}>
-              {mode === 'magic' || mode === 'reset' ? 'Back to password sign in' : 'Sign in with an email link'}
-            </button>
-            <span>or</span>
-            <button type="button" className="auth-google" onClick={() => void googleSignIn()} disabled={busy}>
-              <b aria-hidden="true">G</b> Continue with Google
-            </button>
-          </div>
+          <button type="button" className="auth-alternative" onClick={() => changeMode(mode === 'magic' || mode === 'reset' ? 'signin' : 'magic')}>
+            {mode === 'magic' || mode === 'reset' ? 'Back to password sign in' : 'Sign in with an email link'}
+          </button>
           <p className="auth-privacy">Bank details stay on this device and are never stored in the team database.</p>
         </div>
       </section>

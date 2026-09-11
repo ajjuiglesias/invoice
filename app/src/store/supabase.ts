@@ -236,18 +236,6 @@ export class SupabaseAdapter implements StorageAdapter, TeamAdapter {
     }
   }
 
-  async signInWithGoogle(): Promise<void> {
-    try {
-      const { error } = await this.db.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.origin },
-      });
-      if (error) throw error;
-    } catch (error) {
-      throw new Error(humanise(error));
-    }
-  }
-
   async signOut(): Promise<void> {
     await this.db.auth.signOut();
     this.userId = null;

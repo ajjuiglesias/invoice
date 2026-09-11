@@ -53,11 +53,6 @@ same URL to **Redirect URLs**. Confirmation and passwordless links return there 
 Email-link users can select **Forgot or need to create a password?** on the sign-in screen. The
 recovery email returns them to the app, where they choose a password for future sign-ins.
 
-To offer Google sign-in, enable **Google** under **Authentication → Sign In / Providers**, create a
-Google OAuth client, and copy the client ID and secret into Supabase. Add the Supabase callback URL
-shown on that provider screen to the Google OAuth client's authorised redirect URIs. The Google
-button reports a normal provider error until this is configured.
-
 ## 4. Make yourself an admin
 
 Everyone starts as `freelancer`. Sign in once so your profile row exists, then

@@ -469,10 +469,6 @@ export default function App() {
             if (!cloud) throw new Error('The invoicing service is unavailable. Please refresh and try again.');
             await cloud.requestPasswordReset!(email);
           }}
-          onGoogle={async () => {
-            if (!cloud) throw new Error('The invoicing service is unavailable. Please refresh and try again.');
-            await cloud.signInWithGoogle!();
-          }}
         />
       </div>
     );
