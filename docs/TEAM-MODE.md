@@ -29,6 +29,7 @@ tool, and the Supabase client is never even downloaded.
 In the Supabase dashboard, open **SQL Editor** and run the contents of:
 1. [`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql) — creates the tables, row-level security policies, invoice-numbering function, and approval flow trigger.
 2. [`supabase/migrations/0002_integrity.sql`](../supabase/migrations/0002_integrity.sql) — adds atomic stored procedures (`save_invoice`, `transition_invoice`, `delete_invoice`, `publish_rate_card`) and enforces server-side integrity.
+3. [`supabase/migrations/0003_access_control.sql`](../supabase/migrations/0003_access_control.sql) — enables invitation-only registration, audited role and access controls, and last-admin protection.
 
 ## 3. Point the app at it
 
@@ -59,11 +60,16 @@ Everyone starts as `freelancer`. Sign in once so your profile row exists, then
 in **SQL Editor**:
 
 ```sql
-update profiles set role = 'admin' where email = 'you@example.com';
+update profiles set role = 'admin', active = true where email = 'you@example.com';
 ```
 
 From then on the **Admin** tab lets you set everyone else's role without
 touching SQL.
+
+New users must first be authorised under **Team Members**. Add their exact email and initial role,
+then ask them to use **New user** on the sign-in page. Registrations without a pending invitation
+are rejected. The portal records invitations, role changes, activations, and deactivations in the
+access history.
 
 ## 5. Set up email delivery
 

@@ -2,7 +2,7 @@ import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import { rateItem, type Group, type Indent, type RateItem } from '../domain/rate-card';
 import type { InvoiceStatus, Role } from '../domain/status';
 import { EMPTY_BANK, type BankDetails, type FreelancerProfile, type Invoice, type InvoiceLine } from '../domain/types';
-import type { CurrentUser, Draft, StorageAdapter, TeamAdapter, TeamMember } from './adapter';
+import type { AccessAuditEntry, CurrentUser, Draft, StorageAdapter, TeamAdapter, TeamMember, UserInvite } from './adapter';
 import { requireSupabase } from './supabase-client';
 
 /**
@@ -202,8 +202,12 @@ export class SupabaseAdapter implements StorageAdapter, TeamAdapter {
 
   async signUpWithPassword(email: string, password: string): Promise<void> {
     try {
+      const normalized = email.trim().toLowerCase();
+      const { data: allowed, error: inviteError } = await this.db.rpc('check_invite', { candidate_email: normalized });
+      if (inviteError) throw inviteError;
+      if (!allowed) throw new Error('This email has not been invited. Ask an administrator for access.');
       const { data, error } = await this.db.auth.signUp({
-        email: email.trim(),
+        email: normalized,
         password,
         options: { emailRedirectTo: window.location.origin },
       });
@@ -421,9 +425,54 @@ export class SupabaseAdapter implements StorageAdapter, TeamAdapter {
     }));
   }
 
-  async setRole(memberId: string, role: Role): Promise<void> {
-    const { error } = await this.db.from('profiles').update({ role }).eq('id', memberId);
+  async setRole(memberId: string, role: Role, confirmAdmin = false): Promise<void> {
+    const { error } = await this.db.rpc('set_member_role', {
+      member_id: memberId,
+      assigned_role: role,
+      confirm_admin: confirmAdmin,
+    });
     fail('Could not change that role', error);
+  }
+
+  async setActive(memberId: string, active: boolean): Promise<void> {
+    const { error } = await this.db.rpc('set_member_active', { member_id: memberId, enabled: active });
+    fail(`Could not ${active ? 'activate' : 'deactivate'} that account`, error);
+  }
+
+  async listInvites(): Promise<UserInvite[]> {
+    const { data, error } = await this.db.from('user_invites').select('*').order('created_at', { ascending: false });
+    fail('Could not load invitations', error);
+    return (data ?? []).map((row) => ({
+      id: row.id as string,
+      email: row.email as string,
+      role: row.role as Role,
+      createdAt: row.created_at as string,
+      acceptedAt: (row.accepted_at as string | null) ?? undefined,
+    }));
+  }
+
+  async inviteUser(email: string, role: Role, confirmAdmin = false): Promise<void> {
+    const { error } = await this.db.rpc('create_user_invite', {
+      candidate_email: email.trim().toLowerCase(),
+      assigned_role: role,
+      confirm_admin: confirmAdmin,
+    });
+    fail('Could not authorise that email', error);
+  }
+
+  async revokeInvite(inviteId: string): Promise<void> {
+    const { error } = await this.db.rpc('revoke_user_invite', { invite_id: inviteId });
+    fail('Could not revoke that invitation', error);
+  }
+
+  async listAccessAudit(): Promise<AccessAuditEntry[]> {
+    const { data, error } = await this.db.from('access_audit').select('*').order('created_at', { ascending: false }).limit(100);
+    fail('Could not load access history', error);
+    return (data ?? []).map((row) => ({
+      id: Number(row.id), actorId: row.actor_id as string, targetEmail: row.target_email as string,
+      action: row.action as string, oldRole: (row.old_role as Role | null) ?? undefined,
+      newRole: (row.new_role as Role | null) ?? undefined, createdAt: row.created_at as string,
+    }));
   }
 
   // ---- Rate card ----------------------------------------------------------

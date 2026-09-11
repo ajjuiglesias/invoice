@@ -16,7 +16,7 @@ await db.exec(`
   $$;
 `);
 
-for (const name of ['0001_init.sql', '0002_integrity.sql']) {
+for (const name of ['0001_init.sql', '0002_integrity.sql', '0003_access_control.sql']) {
   const sql = (await readFile(resolve(here, '..', '..', 'supabase', 'migrations', name), 'utf8'))
     // Supabase ships pgcrypto. PGlite does not bundle its control file, while
     // modern Postgres still provides the gen_random_uuid() function we use.
@@ -26,9 +26,22 @@ for (const name of ['0001_init.sql', '0002_integrity.sql']) {
 
 const freelancer = '00000000-0000-4000-8000-000000000001';
 const manager = '00000000-0000-4000-8000-000000000002';
+const admin = '00000000-0000-4000-8000-000000000003';
 const invoice = '00000000-0000-4000-8000-000000000101';
+await db.exec(`insert into auth.users values ('${admin}', 'admin@example.com')`);
+await db.exec(`update profiles set role='admin', active=true where id='${admin}'`);
+await db.exec(`set request.jwt.claim.sub = '${admin}'`);
+await db.query(`select create_user_invite('worker@example.com','freelancer',false)`);
+await db.query(`select create_user_invite('manager@example.com','manager',false)`);
 await db.exec(`insert into auth.users values ('${freelancer}', 'worker@example.com'), ('${manager}', 'manager@example.com')`);
-await db.exec(`update profiles set role='manager' where id='${manager}'`);
+
+const { rows: [invited] } = await db.query(`select active,role::text from profiles where id='${freelancer}'`);
+if (!invited.active || invited.role !== 'freelancer') throw new Error('Invited user was not activated.');
+
+const outsider = '00000000-0000-4000-8000-000000000004';
+await db.exec(`insert into auth.users values ('${outsider}', 'outsider@example.com')`);
+const { rows: [blocked] } = await db.query(`select active from profiles where id='${outsider}'`);
+if (blocked.active) throw new Error('Uninvited user received access.');
 
 await db.exec(`set request.jwt.claim.sub = '${freelancer}'`);
 const { rows: [{ next_invoice_number: first }] } = await db.query('select next_invoice_number()');
@@ -62,6 +75,12 @@ const { rows: [{ status, subtotal, snapshot_name }] } = await db.query(
 if (status !== 'approved' || subtotal !== '50.00' || snapshot_name !== 'Test Freelancer') {
   throw new Error('Invoice save or approval integrity check failed.');
 }
+
+await db.exec(`set request.jwt.claim.sub = '${admin}'`);
+let protectedLastAdmin = false;
+try { await db.query(`select set_member_role('${admin}','freelancer',false)`); }
+catch (error) { protectedLastAdmin = /last active admin/i.test(String(error)); }
+if (!protectedLastAdmin) throw new Error('Last administrator was not protected.');
 
 console.log('Database migrations and secured invoice lifecycle: OK');
 await db.close();

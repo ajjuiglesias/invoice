@@ -11,7 +11,7 @@ import {
 import { isEditable, needsDecision, type InvoiceStatus, type Role } from './domain/status';
 import { EMPTY_PROFILE, type FreelancerProfile, type Invoice, type InvoiceLine } from './domain/types';
 import { validateLine, validateProfile } from './domain/validation';
-import type { CurrentUser, StorageAdapter, TeamAdapter, TeamMember } from './store/adapter';
+import type { AccessAuditEntry, CurrentUser, StorageAdapter, TeamAdapter, TeamMember, UserInvite } from './store/adapter';
 import { LocalStorageAdapter, storageAvailable } from './store/local';
 import { migrateLocalData } from './store/migrate';
 import { AccountsScreen } from './ui/AccountsScreen';
@@ -68,6 +68,8 @@ export default function App() {
   );
   const [queue, setQueue] = useState<Invoice[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
+  const [invites, setInvites] = useState<UserInvite[]>([]);
+  const [accessAudit, setAccessAudit] = useState<AccessAuditEntry[]>([]);
   const [teamBusy, setTeamBusy] = useState(false);
 
   const [profile, setProfile] = useState<FreelancerProfile>(EMPTY_PROFILE);
@@ -254,7 +256,12 @@ export default function App() {
     if (!cloud) return;
     setTeamBusy(true);
     try {
-      setMembers(await cloud.listMembers());
+      const [nextMembers, nextInvites, nextAudit] = await Promise.all([
+        cloud.listMembers(), cloud.listInvites(), cloud.listAccessAudit(),
+      ]);
+      setMembers(nextMembers);
+      setInvites(nextInvites);
+      setAccessAudit(nextAudit);
     } catch (error) {
       setBanner(error instanceof Error ? error.message : 'Could not load the team.');
     } finally {
@@ -316,20 +323,51 @@ export default function App() {
   }, []);
 
   const setMemberRole = useCallback(
-    async (memberId: string, next: Role) => {
+    async (memberId: string, next: Role, confirmAdmin = false) => {
       if (!cloud) return;
       setTeamBusy(true);
       try {
-        await cloud.setRole(memberId, next);
-        setMembers(await cloud.listMembers());
+        await cloud.setRole(memberId, next, confirmAdmin);
+        await refreshMembers();
       } catch (error) {
         setBanner(error instanceof Error ? error.message : 'Could not change that role.');
       } finally {
         setTeamBusy(false);
       }
     },
-    [],
+    [refreshMembers],
   );
+
+  const setMemberActive = useCallback(async (memberId: string, active: boolean) => {
+    if (!cloud) return;
+    setTeamBusy(true);
+    try {
+      await cloud.setActive(memberId, active);
+      await refreshMembers();
+    } catch (error) {
+      setBanner(error instanceof Error ? error.message : 'Could not change account access.');
+    } finally { setTeamBusy(false); }
+  }, [refreshMembers]);
+
+  const inviteUser = useCallback(async (email: string, inviteRole: Role, confirmAdmin = false) => {
+    if (!cloud) return;
+    setTeamBusy(true);
+    try {
+      await cloud.inviteUser(email, inviteRole, confirmAdmin);
+      await refreshMembers();
+    } finally { setTeamBusy(false); }
+  }, [refreshMembers]);
+
+  const revokeInvite = useCallback(async (inviteId: string) => {
+    if (!cloud) return;
+    setTeamBusy(true);
+    try {
+      await cloud.revokeInvite(inviteId);
+      await refreshMembers();
+    } catch (error) {
+      setBanner(error instanceof Error ? error.message : 'Could not revoke that invitation.');
+    } finally { setTeamBusy(false); }
+  }, [refreshMembers]);
 
   const rekey = (source: InvoiceLine[]) =>
     source.map((l) => ({ ...l, key: `${l.rateItemId}-${Date.now()}-${Math.random()}` }));
@@ -560,9 +598,14 @@ export default function App() {
         {step === 'admin' && isAdmin && (
           <AdminScreen
             members={members}
+            invites={invites}
+            accessAudit={accessAudit}
             busy={teamBusy}
             onPublishRateCard={publishRateCard}
             onSetRole={setMemberRole}
+            onSetActive={setMemberActive}
+            onInviteUser={inviteUser}
+            onRevokeInvite={revokeInvite}
             onRefresh={() => void refreshMembers()}
             initialTab={adminTab}
             onTabChange={setAdminTab}

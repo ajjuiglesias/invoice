@@ -45,6 +45,24 @@ export interface TeamMember {
   active: boolean;
 }
 
+export interface UserInvite {
+  id: string;
+  email: string;
+  role: Role;
+  createdAt: string;
+  acceptedAt?: string;
+}
+
+export interface AccessAuditEntry {
+  id: number;
+  actorId: string;
+  targetEmail: string;
+  action: string;
+  oldRole?: Role;
+  newRole?: Role;
+  createdAt: string;
+}
+
 export interface CurrentUser {
   id: string;
   email: string;
@@ -77,7 +95,12 @@ export interface TeamAdapter {
   setStatus(invoiceId: string, to: InvoiceStatus, note?: string): Promise<void>;
 
   listMembers(): Promise<TeamMember[]>;
-  setRole(memberId: string, role: Role): Promise<void>;
+  setRole(memberId: string, role: Role, confirmAdmin?: boolean): Promise<void>;
+  setActive(memberId: string, active: boolean): Promise<void>;
+  listInvites(): Promise<UserInvite[]>;
+  inviteUser(email: string, role: Role, confirmAdmin?: boolean): Promise<void>;
+  revokeInvite(inviteId: string): Promise<void>;
+  listAccessAudit(): Promise<AccessAuditEntry[]>;
 
   /** The published rate card, or null if none has been published yet. */
   loadPublishedRateCard(): Promise<{ version: string; items: RateItem[] } | null>;

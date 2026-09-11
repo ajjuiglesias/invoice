@@ -175,14 +175,20 @@ Expected:
 2. Confirm the first page after sign-in is the management Approvals dashboard, not freelancer details or the invoice builder.
 3. Use the sidebar at desktop width and the mobile menu at phone width.
 4. Open **Team Members**, search users, filter roles, and change a test user's role.
-5. Open **Rate Card & Prices**, search and filter task types.
-6. Change one price, discard it, change it again, and publish a new unique version.
-7. Start a new freelancer invoice after publishing.
-8. Re-open an invoice created before the rate change.
+5. Authorise a new email, confirm it appears under pending invitations, then revoke it.
+6. Authorise it again, create the account with that exact email, and confirm the invitation is accepted.
+7. Deactivate and reactivate a non-admin test account.
+8. Confirm access history records the acting administrator, target user, action, time, and role.
+9. Open **Rate Card & Prices**, search and filter task types.
+10. Change one price, discard it, change it again, and publish a new unique version.
+11. Start a new freelancer invoice after publishing.
+12. Re-open an invoice created before the rate change.
 
 Expected:
 
 - Only Admin sees role and rate-card controls.
+- An email that was not authorised cannot register; a pending invitation uses its assigned role.
+- The final active administrator cannot be demoted or deactivated.
 - Search, filters, counters, mobile navigation, refresh, and collapsed sidebar work.
 - Publishing requires all valid rates and a unique version.
 - New invoices use the new rate.

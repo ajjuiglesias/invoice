@@ -73,7 +73,7 @@ export function AuthScreen({ onMagicLink, onSignIn, onSignUp, onResetPassword }:
           <span className="eyebrow">Secure team access</span>
           <h2>{mode === 'signup' ? 'Create your account' : mode === 'magic' ? 'Email sign-in link' : mode === 'reset' ? 'Create a password' : 'Welcome back'}</h2>
           <p className="auth-card__intro">
-            {mode === 'signup' ? 'Use your work email. New accounts start as freelancers.' :
+            {mode === 'signup' ? 'Use the exact email your administrator authorised for you.' :
               mode === 'magic' ? 'We will send a one-time link. No password needed.' :
               mode === 'reset' ? 'We will email a secure link where you can set or replace your password.' :
                 'Sign in to continue your invoice or review team submissions.'}

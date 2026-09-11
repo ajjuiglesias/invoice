@@ -2,14 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { formatGBP } from '../domain/invoice';
 import { activeRateCard, activeRateCardVersion, GROUPS, type RateItem } from '../domain/rate-card';
 import type { Role } from '../domain/status';
-import type { TeamMember } from '../store/adapter';
+import type { AccessAuditEntry, TeamMember, UserInvite } from '../store/adapter';
 import { Notice } from './components';
 
 interface Props {
   members: TeamMember[];
+  invites: UserInvite[];
+  accessAudit: AccessAuditEntry[];
   busy: boolean;
   onPublishRateCard: (version: string, items: RateItem[]) => Promise<void>;
-  onSetRole: (memberId: string, role: Role) => Promise<void>;
+  onSetRole: (memberId: string, role: Role, confirmAdmin?: boolean) => Promise<void>;
+  onSetActive: (memberId: string, active: boolean) => Promise<void>;
+  onInviteUser: (email: string, role: Role, confirmAdmin?: boolean) => Promise<void>;
+  onRevokeInvite: (inviteId: string) => Promise<void>;
   onRefresh: () => void;
   initialTab?: 'rates' | 'team';
   onTabChange?: (tab: 'rates' | 'team') => void;
@@ -19,9 +24,14 @@ const ROLES: Role[] = ['freelancer', 'manager', 'accounts', 'admin'];
 
 export function AdminScreen({
   members,
+  invites,
+  accessAudit,
   busy,
   onPublishRateCard,
   onSetRole,
+  onSetActive,
+  onInviteUser,
+  onRevokeInvite,
   onRefresh,
   initialTab = 'rates',
   onTabChange,
@@ -47,6 +57,9 @@ export function AdminScreen({
   // Team members state
   const [memberSearch, setMemberSearch] = useState('');
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('All');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<Role>('freelancer');
+  const [inviteStatus, setInviteStatus] = useState<{ tone: 'info' | 'error'; text: string } | null>(null);
 
   const changed = current.filter((item) => prices[item.id] !== item.price);
   const invalid = current.some((item) => !(prices[item.id] > 0));
@@ -109,6 +122,41 @@ export function AdminScreen({
       admins: members.filter((m) => m.role === 'admin').length,
     };
   }, [members]);
+
+  const pendingInvites = invites.filter((invite) => !invite.acceptedAt);
+
+  const submitInvite = async () => {
+    const email = inviteEmail.trim().toLowerCase();
+    if (!email) return;
+    const confirmAdmin = inviteRole !== 'admin' || window.confirm(
+      `Grant full administrator access to ${email}? Admins can manage users, rates, approvals, and accounts.`,
+    );
+    if (!confirmAdmin) return;
+    setInviteStatus(null);
+    try {
+      await onInviteUser(email, inviteRole, inviteRole === 'admin');
+      setInviteEmail('');
+      setInviteRole('freelancer');
+      setInviteStatus({ tone: 'info', text: `${email} is authorised. Ask them to create an account with this exact email.` });
+    } catch (error) {
+      setInviteStatus({ tone: 'error', text: error instanceof Error ? error.message : 'Could not authorise that email.' });
+    }
+  };
+
+  const changeRole = async (member: TeamMember, nextRole: Role) => {
+    if (nextRole === member.role) return;
+    const confirmed = nextRole !== 'admin' || window.confirm(
+      `Grant full administrator access to ${member.fullName || member.email}? This includes users, rates, approvals, and accounts.`,
+    );
+    if (!confirmed) return;
+    await onSetRole(member.id, nextRole, nextRole === 'admin');
+  };
+
+  const changeAccess = async (member: TeamMember) => {
+    const action = member.active ? 'Deactivate' : 'Activate';
+    if (!window.confirm(`${action} ${member.fullName || member.email}?${member.active ? ' They will be signed out and unable to use the portal.' : ''}`)) return;
+    await onSetActive(member.id, !member.active);
+  };
 
   return (
     <div className="admin-page">
@@ -358,6 +406,31 @@ export function AdminScreen({
             </div>
           </div>
 
+          <div className="admin-panel-card admin-invite-panel">
+            <div className="admin-invite-copy">
+              <span className="eyebrow">Invitation-only access</span>
+              <h3>Authorise a new team member</h3>
+              <p>Add their exact email before they create an account. Unauthorised registrations are blocked.</p>
+            </div>
+            <div className="admin-invite-form">
+              <input type="email" value={inviteEmail} placeholder="name@example.com" aria-label="Email to authorise" onChange={(e) => setInviteEmail(e.target.value)} />
+              <select value={inviteRole} aria-label="Initial role" onChange={(e) => setInviteRole(e.target.value as Role)}>
+                {ROLES.map((role) => <option key={role} value={role}>{capitalize(role)}</option>)}
+              </select>
+              <button type="button" className="admin-btn admin-btn--primary" disabled={busy || !inviteEmail.trim()} onClick={() => void submitInvite()}>Authorise email</button>
+            </div>
+            {inviteStatus && <Notice tone={inviteStatus.tone}>{inviteStatus.text}</Notice>}
+          </div>
+
+          {pendingInvites.length > 0 && (
+            <div className="admin-panel-card admin-access-section">
+              <div className="admin-access-heading"><div><h3>Pending invitations</h3><p>Authorised emails that have not created an account yet.</p></div><span className="admin-tab__badge">{pendingInvites.length}</span></div>
+              <div className="admin-table-container"><table className="admin-table"><thead><tr><th>Email</th><th>Initial role</th><th>Created</th><th></th></tr></thead><tbody>
+                {pendingInvites.map((invite) => <tr key={invite.id}><td><strong>{invite.email}</strong></td><td><span className={`admin-role-pill admin-role-pill--${invite.role}`}>{invite.role}</span></td><td className="admin-table-faint">{new Date(invite.createdAt).toLocaleString('en-GB')}</td><td><button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" disabled={busy} onClick={() => { if (window.confirm(`Revoke the invitation for ${invite.email}?`)) void onRevokeInvite(invite.id); }}>Revoke</button></td></tr>)}
+              </tbody></table></div>
+            </div>
+          )}
+
           <div className="admin-panel-card">
             {/* Filter Bar */}
             <div className="admin-filter-bar">
@@ -464,10 +537,10 @@ export function AdminScreen({
                           </td>
                           <td className="admin-table-faint">{member.email}</td>
                           <td>
-                            <span className={`admin-status-badge ${member.active ? 'admin-status-badge--active' : 'admin-status-badge--inactive'}`}>
+                            <button type="button" className={`admin-status-badge admin-status-control ${member.active ? 'admin-status-badge--active' : 'admin-status-badge--inactive'}`} disabled={busy} onClick={() => void changeAccess(member)} title={member.active ? 'Deactivate account' : 'Activate account'}>
                               <span className="admin-status-dot" />
                               {member.active ? 'Active' : 'Inactive'}
-                            </span>
+                            </button>
                           </td>
                           <td>
                             <div className="admin-role-select-wrap">
@@ -476,7 +549,7 @@ export function AdminScreen({
                                 value={member.role}
                                 disabled={busy}
                                 aria-label={`Role for ${member.fullName || member.email}`}
-                                onChange={(e) => void onSetRole(member.id, e.target.value as Role)}
+                                onChange={(e) => void changeRole(member, e.target.value as Role)}
                               >
                                 {ROLES.map((r) => (
                                   <option key={r} value={r}>
@@ -494,6 +567,15 @@ export function AdminScreen({
               )}
             </div>
           </div>
+
+          <div className="admin-panel-card admin-access-section">
+            <div className="admin-access-heading"><div><h3>Access history</h3><p>The latest invitations, role changes, activations, and deactivations.</p></div></div>
+            {accessAudit.length === 0 ? <p className="empty" style={{ padding: 24 }}>No access changes recorded yet.</p> : (
+              <div className="admin-table-container"><table className="admin-table"><thead><tr><th>When</th><th>Changed by</th><th>User</th><th>Action</th><th>Role change</th></tr></thead><tbody>
+                {accessAudit.map((entry) => <tr key={entry.id}><td className="admin-table-faint">{new Date(entry.createdAt).toLocaleString('en-GB')}</td><td>{members.find((member) => member.id === entry.actorId)?.email ?? 'Administrator'}</td><td>{entry.targetEmail}</td><td>{formatAuditAction(entry.action)}</td><td className="admin-table-faint">{entry.oldRole && entry.oldRole !== entry.newRole ? `${capitalize(entry.oldRole)} → ` : ''}{entry.newRole ? capitalize(entry.newRole) : '—'}</td></tr>)}
+              </tbody></table></div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -510,4 +592,8 @@ function suggestVersion(current: string): string {
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function formatAuditAction(action: string): string {
+  return action.split('_').map(capitalize).join(' ');
 }
