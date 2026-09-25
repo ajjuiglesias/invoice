@@ -175,18 +175,6 @@ export class SupabaseAdapter implements StorageAdapter, TeamAdapter {
     return null;
   }
 
-  async signInWithEmail(email: string): Promise<void> {
-    try {
-      const { error } = await this.db.auth.signInWithOtp({
-        email: email.trim(),
-        options: { emailRedirectTo: window.location.origin },
-      });
-      if (error) throw new Error(error.message);
-    } catch (error) {
-      throw new Error(humanise(error));
-    }
-  }
-
   async signInWithPassword(email: string, password: string): Promise<void> {
     try {
       const { data, error } = await this.db.auth.signInWithPassword({
@@ -209,23 +197,9 @@ export class SupabaseAdapter implements StorageAdapter, TeamAdapter {
       const { data, error } = await this.db.auth.signUp({
         email: normalized,
         password,
-        options: { emailRedirectTo: window.location.origin },
       });
       if (error) throw error;
       this.userId = data.session?.user.id ?? null;
-    } catch (error) {
-      throw new Error(humanise(error));
-    }
-  }
-
-  async requestPasswordReset(email: string): Promise<void> {
-    try {
-      const redirectTo = new URL(window.location.origin);
-      redirectTo.searchParams.set('reset-password', '1');
-      const { error } = await this.db.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: redirectTo.toString(),
-      });
-      if (error) throw error;
     } catch (error) {
       throw new Error(humanise(error));
     }

@@ -516,11 +516,6 @@ export default function App() {
       <div className="app">
         {authError && <div className="auth-global-error"><Notice tone="error">{authError}</Notice></div>}
         <AuthScreen
-          onMagicLink={async (email) => {
-            setAuthError(null);
-            if (!cloud) throw new Error('The invoicing service is unavailable. Please refresh and try again.');
-            await cloud.signInWithEmail(email);
-          }}
           onSignIn={async (email, password) => {
             setAuthError(null);
             if (!cloud) throw new Error('The invoicing service is unavailable. Please refresh and try again.');
@@ -533,11 +528,10 @@ export default function App() {
             if (!cloud) throw new Error('The invoicing service is unavailable. Please refresh and try again.');
             await cloud.signUpWithPassword!(email, password);
             const current = await cloud.currentUser();
-            if (current) setUser(current);
-          }}
-          onResetPassword={async (email) => {
-            if (!cloud) throw new Error('The invoicing service is unavailable. Please refresh and try again.');
-            await cloud.requestPasswordReset!(email);
+            if (!current) {
+              throw new Error('Email confirmation is still enabled. Ask the administrator to turn it off in Supabase so signup can finish without email.');
+            }
+            setUser(current);
           }}
         />
       </div>

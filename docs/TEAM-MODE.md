@@ -5,7 +5,7 @@ are set.
 
 | | **Personal** (default) | **Team** |
 | --- | --- | --- |
-| Accounts | None | Password or email-link sign-in |
+| Accounts | None | Email and password |
 | Storage | This browser only | Shared database |
 | Invoice history | This browser only | Follows you between devices |
 | Approval | Local record | In-app queue for the line manager |
@@ -49,11 +49,8 @@ Restart the dev server, or set the same two variables in your host's
 environment (Vercel: Settings → Environment Variables; Netlify: Site
 configuration → Environment variables) and redeploy.
 
-In **Authentication → URL Configuration**, set **Site URL** to the deployed app URL and add the
-same URL to **Redirect URLs**. Confirmation and passwordless links return there after sign-in.
-
-Email-link users can select **Forgot or need to create a password?** on the sign-in screen. The
-recovery email returns them to the app, where they choose a password for future sign-ins.
+In **Authentication → Sign In / Providers → Email**, turn **Confirm email** off for this simple
+setup. New users can then create a password and enter the app without waiting for an email.
 
 ## 4. Make yourself an admin
 
@@ -72,14 +69,17 @@ then ask them to use **New user** on the sign-in page. Registrations without a p
 are rejected. The portal records invitations, role changes, activations, and deactivations in the
 access history.
 
-## 5. Set up authentication email delivery
+## 5. Email-free sign-in for the demo
 
-Supabase's built-in email sender is rate-limited and only really suitable for
-testing. For real use, add an SMTP provider under
-**Authentication → Email Templates → SMTP Settings**.
+This setup needs no SMTP provider. The administrator first authorises each exact email and role in
+**Team Members**. The invited person selects **New user**, enters that email, and chooses a
+password. Existing users sign in with the same email and password.
 
-Sign-in links come from whatever address you configure there, so a
-`@juliacharles.co.uk` sender needs the DNS records for that domain.
+With **Confirm email** off, Supabase treats the typed address as verified. Use this for a controlled
+demo with known staff. Anyone who knows an authorised address could claim it before its intended
+owner. Password recovery also needs email; until SMTP is configured, an administrator must handle
+reset requests through a trusted Supabase Auth admin process. Do not put a Supabase secret key in
+the browser app.
 
 ---
 

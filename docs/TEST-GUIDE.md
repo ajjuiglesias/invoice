@@ -28,34 +28,29 @@ Refresh or sign out and back in after changing a role.
 1. Open the app in an incognito window.
 2. Select **New user**.
 3. Confirm an invalid email and a password shorter than eight characters cannot be submitted.
-4. Enter a real test email and a password of at least eight characters.
+4. Enter an email the administrator authorised and a password of at least eight characters.
 5. Select **Create account**.
-6. If Supabase email confirmation is enabled, open the confirmation email and return to the app.
 
 Expected:
 
 - The account is created as a freelancer.
-- The user reaches the freelancer details screen after confirmation/sign-in.
+- The user is signed in immediately and reaches the freelancer details screen.
 - No admin controls are visible.
+- No confirmation email is required.
 
 ### Existing user
 
 1. Select **Sign in**.
 2. Enter an incorrect password and confirm a clear error appears.
 3. Enter the correct password.
-4. Sign out, select **Sign in with an email link**, and request a link.
-5. Sign out, select **Forgot or need to create a password?**, and request a setup link.
-6. Open the setup link, verify mismatched passwords are rejected, and save a matching password of
-   at least eight characters.
-7. Sign out and sign in with the new password.
+4. Sign out and sign back in with the same email and password.
 
 Expected:
 
 - Correct credentials restore the same profile, draft, and invoice history.
-- The passwordless link returns to the app and signs in the same user.
-- An email-link-only user can create a password without creating a second account.
-- The recovery link opens the branded password setup screen and the new password works afterwards.
+- The same account and profile return after sign-in.
 - Signing out prevents access to authenticated pages.
+- Forgot-password requests are handled by an administrator until SMTP is configured.
 
 ## 2. Freelancer profile and autosave
 
@@ -213,7 +208,7 @@ Expected:
 
 ## Release acceptance checklist
 
-- [ ] Sign-up, confirmation, password sign-in, passwordless sign-in, and sign-out pass.
+- [ ] Invited-user sign-up, password sign-in, and sign-out pass with Supabase Confirm email disabled.
 - [ ] Freelancer profile and user-specific bank storage pass.
 - [ ] Draft autosave and restore pass.
 - [ ] Excel and PDF match the reviewed invoice.

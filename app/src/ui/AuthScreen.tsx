@@ -3,15 +3,13 @@ import { COMPANY } from '../domain/company';
 import { Notice } from './components';
 
 interface Props {
-  onMagicLink: (email: string) => Promise<void>;
   onSignIn: (email: string, password: string) => Promise<void>;
   onSignUp: (email: string, password: string) => Promise<void>;
-  onResetPassword: (email: string) => Promise<void>;
 }
 
-type Mode = 'signin' | 'signup' | 'magic' | 'reset';
+type Mode = 'signin' | 'signup';
 
-export function AuthScreen({ onMagicLink, onSignIn, onSignUp, onResetPassword }: Props) {
+export function AuthScreen({ onSignIn, onSignUp }: Props) {
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,19 +21,13 @@ export function AuthScreen({ onMagicLink, onSignIn, onSignUp, onResetPassword }:
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busy || !validEmail || (!['magic', 'reset'].includes(mode) && !validPassword)) return;
+    if (busy || !validEmail || !validPassword) return;
     setBusy(true);
     setMessage(null);
     try {
-      if (mode === 'reset') {
-        await onResetPassword(email.trim());
-        setMessage({ tone: 'info', text: `Password setup link sent to ${email.trim()}. Open it to create your password.` });
-      } else if (mode === 'magic') {
-        await onMagicLink(email.trim());
-        setMessage({ tone: 'info', text: `Sign-in link sent to ${email.trim()}. Open it on this device.` });
-      } else if (mode === 'signup') {
+      if (mode === 'signup') {
         await onSignUp(email.trim(), password);
-        setMessage({ tone: 'info', text: 'Account created. Check your inbox if email confirmation is enabled.' });
+        setMessage({ tone: 'info', text: 'Account created. You are signed in.' });
       } else {
         await onSignIn(email.trim(), password);
       }
@@ -71,12 +63,10 @@ export function AuthScreen({ onMagicLink, onSignIn, onSignUp, onResetPassword }:
       <section className="auth-panel">
         <div className="auth-card">
           <span className="eyebrow">Secure team access</span>
-          <h2>{mode === 'signup' ? 'Create your account' : mode === 'magic' ? 'Email sign-in link' : mode === 'reset' ? 'Create a password' : 'Welcome back'}</h2>
+          <h2>{mode === 'signup' ? 'Create your account' : 'Welcome back'}</h2>
           <p className="auth-card__intro">
-            {mode === 'signup' ? 'Use the exact email your administrator authorised for you.' :
-              mode === 'magic' ? 'We will send a one-time link. No password needed.' :
-              mode === 'reset' ? 'We will email a secure link where you can set or replace your password.' :
-                'Sign in to continue your invoice or review team submissions.'}
+            {mode === 'signup' ? 'Use the email your administrator authorised, then choose a password. You’ll be signed in straight away when email confirmation is off.' :
+              'Sign in with your email and password to continue.'}
           </p>
 
           <div className="auth-tabs" role="tablist" aria-label="Account action">
@@ -93,31 +83,26 @@ export function AuthScreen({ onMagicLink, onSignIn, onSignUp, onResetPassword }:
                 onChange={(event) => setEmail(event.target.value)} />
             </label>
 
-            {mode !== 'magic' && mode !== 'reset' && (
-              <label>
-                <span>Password</span>
-                <div className="password-field">
-                  <input type={showPassword ? 'text' : 'password'} value={password}
-                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                    placeholder={mode === 'signup' ? 'At least 8 characters' : 'Your password'}
-                    aria-invalid={(password.length > 0 && !validPassword) || undefined}
-                    onChange={(event) => setPassword(event.target.value)} />
-                  <button type="button" onClick={() => setShowPassword((shown) => !shown)}>{showPassword ? 'Hide' : 'Show'}</button>
-                </div>
-              </label>
-            )}
+            <label>
+              <span>Password</span>
+              <div className="password-field">
+                <input type={showPassword ? 'text' : 'password'} value={password}
+                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                  placeholder={mode === 'signup' ? 'At least 8 characters' : 'Your password'}
+                  aria-invalid={(password.length > 0 && !validPassword) || undefined}
+                  onChange={(event) => setPassword(event.target.value)} />
+                <button type="button" onClick={() => setShowPassword((shown) => !shown)}>{showPassword ? 'Hide' : 'Show'}</button>
+              </div>
+            </label>
 
             <button className="btn btn--primary auth-submit" type="submit"
-              disabled={busy || !validEmail || (!['magic', 'reset'].includes(mode) && !validPassword)}>
+              disabled={busy || !validEmail || !validPassword}>
               {busy ? <><span className="spinner" aria-hidden="true" /> Please wait…</> :
-                mode === 'signup' ? 'Create account' : mode === 'magic' ? 'Send secure link' : mode === 'reset' ? 'Send password setup link' : 'Sign in'}
+                mode === 'signup' ? 'Create account' : 'Sign in'}
             </button>
           </form>
 
-          {mode === 'signin' && <button type="button" className="auth-forgot" onClick={() => changeMode('reset')}>Forgot or need to create a password?</button>}
-          <button type="button" className="auth-alternative" onClick={() => changeMode(mode === 'magic' || mode === 'reset' ? 'signin' : 'magic')}>
-            {mode === 'magic' || mode === 'reset' ? 'Back to password sign in' : 'Sign in with an email link'}
-          </button>
+          {mode === 'signin' && <p className="auth-forgot">Forgot your password? Contact your administrator.</p>}
           <p className="auth-privacy">Bank details stay on this device and are never stored in the team database.</p>
         </div>
       </section>

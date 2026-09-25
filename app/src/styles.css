@@ -1118,7 +1118,7 @@ select:disabled {
 .password-field button { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); border: 0; background: none; color: var(--teal-dark); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
 .auth-submit { width: 100%; min-height: 46px; margin-top: 3px; justify-content: center; }
 .auth-alternative { width: 100%; margin-top: 18px; border: 0; background: none; color: var(--teal-dark); font: inherit; font-weight: 700; cursor: pointer; }
-.auth-forgot { display: block; margin: 12px auto 0; border: 0; background: none; color: var(--teal-dark); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.auth-forgot { margin: 12px 0 0; color: var(--ink-muted); text-align: center; font-size: 13px; }
 .field-error { margin-top: -10px; color: var(--red); font-size: 12px; }
 .admin-invite-panel { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(420px, 1.4fr); gap: 22px 32px; align-items: end; margin-bottom: 20px; padding: 22px; }
 .admin-invite-copy h3, .admin-access-heading h3 { margin: 5px 0 4px; color: var(--charcoal); font-size: 18px; }
